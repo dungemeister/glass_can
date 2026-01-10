@@ -67,6 +67,9 @@ private:
     //InlineKeyboard
     json getKeyboardForUser(uint64_t chat_id);
     json mainMenuKeyboard();
+    json steamMenuKeyboard();
+
+    void handleCallbackQuery(const json& callback);
     //DataBase
     void initDatabase();
 
@@ -80,4 +83,7 @@ private:
     BotContext m_context;
     
     std::unordered_map<TgAPIRequest, std::tuple<std::string, RequestType>> m_requests_table;
+
+    const std::string c_main_menu_string  = "main_menu";
+    const std::string c_steam_menu_string = "steam_menu";
 };

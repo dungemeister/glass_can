@@ -89,7 +89,7 @@ json TgBot::callMethod(const std::string& method, RequestType type, const json& 
         if(!doc["ok"].get<bool>()){
             auto error = doc.value("description", "Unknown Error");
             auto error_code = doc.value("error_code", 0);
-            throw std::runtime_error("Telegram API error: " + std::to_string(error_code) + "-" + error);
+            throw std::runtime_error(method + ": Telegram API error: " + std::to_string(error_code) + "-" + error);
         }
         return doc["result"];
 
@@ -165,7 +165,7 @@ void TgBot::loop(){
         auto updates = getUpdates(offset);
         for(const auto& update: updates){
             offset = update["update_id"].get<uint64_t>() + 1;
-            std::cout << update.dump() << std::endl;
+            std::cout << update.dump() << "\n" << std::endl;
 
             if(update.contains("message")){
                 auto message = update["message"];
@@ -214,8 +214,11 @@ void TgBot::loop(){
                     }
                 }
             }
+            if(update.contains("callback_query")){
+                handleCallbackQuery(update["callback_query"]);
+            }
         }
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
     }
 }
 
@@ -351,26 +354,82 @@ json TgBot::getAvailableGifts(){
 json TgBot::mainMenuKeyboard(){
     return {
             {"inline_keyboard", {
-                { {{ "text", "Отслеживаемый список steam"},     {"callback_data", "steam_list"}} ,
-                 {{ "text", "Добавить в steam список"},      {"callback_data", "steam_add"}} },
-                { {{ "text", "Удалить из steam списка"},   {"callback_data", "steam_delete"}} },
+                { {{ "text", "Steam список"},                   {"callback_data", c_steam_menu_string}} },
+                { {{ "text", "Другой список"},                  {"callback_data", "other_menu"}} },
             }}
     };
 }
+
 
 json TgBot::getKeyboardForUser(uint64_t chat_id){
     auto state = m_context.getState(chat_id);
     switch(state){
         case BotContext::BotState::MAIN_MENU:
             return mainMenuKeyboard();
-        
-        case BotContext::BotState::ADD_LINK:
+
+        case BotContext::BotState::STEAM_MENU:
+            return steamMenuKeyboard();
+
+        case BotContext::BotState::OTHER_MENU:
+            return {};
+
+        case BotContext::BotState::STEAM_ADD_LINK:
             return {};
         
-        case BotContext::BotState::DELETE_LINK:
+        case BotContext::BotState::STEAM_DELETE_LINK:
             return {};
         
-        case BotContext::BotState::LIST_LINKS:
+        case BotContext::BotState::STEAM_LIST_LINKS:
             return {};
+    }
+}
+
+json TgBot::steamMenuKeyboard(){
+    return {
+            {"inline_keyboard", {
+                { {{ "text", "Отобразить список"},              {"callback_data", "steam_list"}} ,
+                  {{ "text", "Добавить в список"},              {"callback_data", "steam_add"}} },
+
+                { {{ "text", "Текущая инфа списка"},            {"callback_data", "steam_delete"}},
+                  {{ "text", "Удалить из списка"},              {"callback_data", "steam_delete"}}},
+
+                { {{ "text", "В главное меню"},                 {"callback_data", c_main_menu_string}} },
+            }}
+            };
+}
+
+void TgBot::handleCallbackQuery(const json& callback){
+    try{
+        auto chat_id = callback["from"]["id"].get<uint64_t>();
+        auto message_id = callback["message"]["message_id"].get<uint64_t>();
+        if(callback.contains("data")){
+            auto data = callback["data"];
+            auto res = callMethod("answerCallbackQuery", RequestType::ePOST, {
+                                    {"callback_query_id", callback["id"]}
+                                });
+            if(data.get<std::string>() == c_main_menu_string){
+                callMethod("editMessageText", RequestType::ePOST, {
+                            {"chat_id", chat_id},
+                            {"message_id", message_id},
+                            {"text", "*Main Menu*"},
+                            {"parse_mode", "MarkdownV2"},
+                            {"reply_markup", mainMenuKeyboard()}
+
+                            });
+            }
+            if(data.get<std::string>() == c_steam_menu_string){
+                callMethod("editMessageText", RequestType::ePOST, {
+                            {"chat_id", chat_id},
+                            {"message_id", message_id},
+                            {"text", "*Steam Menu*"},
+                            {"parse_mode", "MarkdownV2"},
+                            {"reply_markup", steamMenuKeyboard()}
+
+                            });
+            }
+        }
+    }
+    catch(const std::exception& e){
+        std::cerr << "handleCallbackQuery: " << e.what() << std::endl;
     }
 }
