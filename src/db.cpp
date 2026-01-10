@@ -1,0 +1,110 @@
+#include "db.h"
+#include <iostream>
+#include <sstream>
+
+DataBase::DataBase(const std::string& file)
+:m_file(file)
+{
+    auto exit = sqlite3_open(file.c_str(), &m_db);
+    if(exit){
+        std::cerr << "Database " << file << sqlite3_errmsg(m_db) << std::endl;
+    }
+    else{
+        initSchema();
+    }
+}
+
+DataBase::~DataBase(){
+    sqlite3_close(m_db);
+}
+
+void DataBase::initSchema(){
+    try{
+        exec(R"(
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER UNIQUE NOT NULL,
+                username TEXT,
+                first_name TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS user_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                url TEXT NOT NULL UNIQUE,
+                title TEXT,
+                last_checked DATETIME,
+                status TEXT DEFAULT 'active',
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+        )");
+    }
+    catch(const std::exception& e){
+        std::cerr << "initSchema: " << e.what() << std::endl;
+    }
+}
+
+void DataBase::exec(const std::string& sql){
+    // (INSERT/UPDATE/DELETE)
+    char* error = nullptr;
+    if (sqlite3_exec(m_db, sql.c_str(), nullptr, nullptr, &error) != SQLITE_OK) {
+        std::string err = error;
+        sqlite3_free(error);
+        throw std::runtime_error("SQL error: " + err);
+    }
+}
+
+int64_t DataBase::addUser(int64_t chat_id, const std::string& username = "", 
+                      const std::string& first_name = ""){
+    try{
+
+        std::stringstream command;
+        command << "INSERT OR IGNORE INTO users (chat_id, username, first_name)\n VALUES (" <<
+                chat_id << ", '" <<
+                username << "', '" <<
+                first_name << "');";
+        query(command.str());
+        return getUserId(chat_id);
+    }
+    catch(const std::exception& e){
+        std::cerr << "addUser: " << e.what() << std::endl;
+        return -1;
+    }
+}
+
+int64_t DataBase::getUserId(int64_t chat_id){
+    std::stringstream q;
+    q << "SELECT id FROM users WHERE chat_id = " <<
+         chat_id << ";" << std::endl;
+    auto users = query(q.str());
+    if(users.empty()){
+        throw std::runtime_error("getUserId: user with chat_id=" + std::to_string(chat_id) + " not found");
+    }
+    return std::atol(users[0]["id"].get<std::string>().c_str());
+}
+
+std::vector<nlohmann::json> DataBase::query(const std::string& sql){
+    std::vector<nlohmann::json> rows;
+    char* err = nullptr;
+
+    auto cb = [](void* data, int argc, char** argv, char** col) -> int {
+        auto* out = static_cast<std::vector<nlohmann::json>*>(data);
+
+        nlohmann::json row;
+        for (int i = 0; i < argc; ++i) {
+            // argv[i] == nullptr означает SQL NULL
+            row[col[i]] = argv[i] ? argv[i] : nullptr;
+        }
+        out->push_back(std::move(row));
+        return 0; // 0 = продолжать
+    };
+
+    if(auto res = sqlite3_exec(m_db, sql.c_str(), cb, &rows, &err); res != SQLITE_OK){
+        std::string error_msg = err ? err: "Unknown Error";
+        sqlite3_free(err);
+        throw std::runtime_error("SQL query error: " + error_msg);
+    }
+
+    return rows;
+}
