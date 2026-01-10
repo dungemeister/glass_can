@@ -3,7 +3,7 @@
 #include <thread>
 #include <fstream>
 
-void TgBot::init_requests_table(){
+void TgBot::initRequestsTable(){
     m_requests_table = {
         {TgAPIRequest::eGET_UPDATES,           {"getUpdates",            RequestType::eGET}},
         {TgAPIRequest::eGET_ME,                {"getMe",                 RequestType::eGET}},
@@ -146,6 +146,35 @@ void TgBot::parseGetMeResponse(json response){
     std::cout << "Bot: " << m_name << ". ID: " << m_id << std::endl;
 }
 
+void TgBot::handleText(uint64_t chat_id, const std::string& text){
+    auto user_context = m_context.getState(chat_id);
+    auto user_state = std::get<0>(user_context);
+    auto username = std::get<1>(user_context);
+
+    std::cout << "#" << chat_id << ": " << text << std::endl;
+    if(text == "ping"){
+        std::string msg = "*pong*";
+
+        sendMessage(chat_id, msg);
+    }
+    if(text == "/start"){
+        m_context.switchState(chat_id, BotContext::BotState::MAIN_MENU);
+
+        auto inline_keyboard = getMenuForUser(chat_id);
+        sendMessage(chat_id, "Hello, @" + username, inline_keyboard);
+    }
+    switch(user_state){
+        case BotContext::BotState::STEAM_ADD_LINK:
+            if(auto res = addSteamLink(chat_id, text); !res){
+                sendMessage(chat_id, "Ошибка добавления", steamMenu());
+            }
+            else{
+                sendMessage(chat_id, "Ссылка добавлена", steamMenu());
+            }
+        break;
+    }
+}
+
 void TgBot::loop(){
     std::cout << "Running SQLite Database..." << std::endl;
     initDatabase();
@@ -165,31 +194,20 @@ void TgBot::loop(){
         auto updates = getUpdates(offset);
         for(const auto& update: updates){
             offset = update["update_id"].get<uint64_t>() + 1;
-            std::cout << update.dump() << "\n" << std::endl;
+            // std::cout << update.dump() << "\n" << std::endl;
 
             if(update.contains("message")){
                 auto message = update["message"];
                 std::string username = message["chat"]["username"];
                 std::string first_name = message["chat"]["first_name"];
-                uint64_t chat_id = message["chat"]["id"];
+                auto chat_id = message["chat"]["id"].get<uint64_t>();
 
+                auto user_state = m_context.getState(chat_id);
                 auto user_id = m_sqlite_db->addUser(chat_id, username, first_name);
                 //Handling text messages
                 if(message.contains("text")){
-
                     auto text = message["text"].get<std::string>();
-                    std::cout << "#" << chat_id << ": " << text << std::endl;
-                    if(text == "ping"){
-                        std::string msg = "*pong*";
-
-                        sendMessage(chat_id, msg);
-                    }
-                    if(text == "/start"){
-                        m_context.switchState(chat_id, BotContext::BotState::MAIN_MENU);
-
-                        auto inline_keyboard = getKeyboardForUser(chat_id);
-                        sendMessage(chat_id, "Hello, @" + username, inline_keyboard);
-                    }
+                    handleText(chat_id, text);
                     
                 }
                 //Handling voice messages
@@ -351,7 +369,7 @@ json TgBot::getAvailableGifts(){
     }
 }
 
-json TgBot::mainMenuKeyboard(){
+json TgBot::mainMenu(){
     return {
             {"inline_keyboard", {
                 { {{ "text", "Steam список"},                   {"callback_data", c_steam_menu_string}} },
@@ -361,14 +379,16 @@ json TgBot::mainMenuKeyboard(){
 }
 
 
-json TgBot::getKeyboardForUser(uint64_t chat_id){
-    auto state = m_context.getState(chat_id);
+json TgBot::getMenuForUser(uint64_t chat_id){
+    auto context = m_context.getState(chat_id);
+    auto state = std::get<0>(context);
+
     switch(state){
         case BotContext::BotState::MAIN_MENU:
-            return mainMenuKeyboard();
+            return mainMenu();
 
         case BotContext::BotState::STEAM_MENU:
-            return steamMenuKeyboard();
+            return steamMenu();
 
         case BotContext::BotState::OTHER_MENU:
             return {};
@@ -384,18 +404,27 @@ json TgBot::getKeyboardForUser(uint64_t chat_id){
     }
 }
 
-json TgBot::steamMenuKeyboard(){
+json TgBot::steamMenu(){
     return {
             {"inline_keyboard", {
-                { {{ "text", "Отобразить список"},              {"callback_data", "steam_list"}} ,
-                  {{ "text", "Добавить в список"},              {"callback_data", "steam_add"}} },
+                { {{ "text", "Отобразить список"},              {"callback_data", c_steam_list_string}} ,
+                  {{ "text", "Добавить в список"},              {"callback_data", c_steam_add_string}} },
 
-                { {{ "text", "Текущая инфа списка"},            {"callback_data", "steam_delete"}},
-                  {{ "text", "Удалить из списка"},              {"callback_data", "steam_delete"}}},
+                { {{ "text", "Текущая инфа списка"},            {"callback_data", c_steam_info_string}},
+                  {{ "text", "Удалить из списка"},              {"callback_data", c_steam_delete_string}}},
 
                 { {{ "text", "В главное меню"},                 {"callback_data", c_main_menu_string}} },
             }}
             };
+}
+
+json TgBot::steamAddLinkMenu(){
+    return{
+            {"inline_keyboard", {
+                { {{"text", "Отмена"},         {"callback_data", c_steam_menu_string}} },
+                { {{"text", "В главное меню"}, {"callback_data", c_main_menu_string}} }
+            }}
+        };
 }
 
 void TgBot::handleCallbackQuery(const json& callback){
@@ -413,9 +442,10 @@ void TgBot::handleCallbackQuery(const json& callback){
                             {"message_id", message_id},
                             {"text", "*Main Menu*"},
                             {"parse_mode", "MarkdownV2"},
-                            {"reply_markup", mainMenuKeyboard()}
+                            {"reply_markup", mainMenu()}
 
                             });
+                m_context.switchState(chat_id, BotContext::BotState::MAIN_MENU);
             }
             if(data.get<std::string>() == c_steam_menu_string){
                 callMethod("editMessageText", RequestType::ePOST, {
@@ -423,13 +453,42 @@ void TgBot::handleCallbackQuery(const json& callback){
                             {"message_id", message_id},
                             {"text", "*Steam Menu*"},
                             {"parse_mode", "MarkdownV2"},
-                            {"reply_markup", steamMenuKeyboard()}
+                            {"reply_markup", steamMenu()}
 
                             });
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
+                
+            }
+            if(data.get<std::string>() == c_steam_list_string){
+                auto links = m_sqlite_db->getUserLinks(chat_id);
+                for(auto& link: links){
+                    std::cout << link.dump() << std::endl;
+                }
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_LIST_LINKS);
+            }
+            if(data.get<std::string>() == c_steam_add_string){
+                callMethod("editMessageText", RequestType::ePOST, {
+                            {"chat_id", chat_id},
+                            {"message_id", message_id},
+                            {"text", "*Steam Add Link Menu*\n Отправь ссылку для отслеживания в формате 'https://example\\.com \\- CS2 Spectrum case'"},
+                            {"parse_mode", "MarkdownV2"},
+                            {"reply_markup", steamAddLinkMenu()}
+
+                            });
+                
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_ADD_LINK);
+                
             }
         }
     }
     catch(const std::exception& e){
         std::cerr << "handleCallbackQuery: " << e.what() << std::endl;
     }
+}
+
+bool TgBot::addSteamLink(uint64_t chat_id, const std::string& line){
+    auto& link = line;
+    auto title = "temp";
+    
+    return m_sqlite_db->addUserLink(chat_id, link, title);
 }

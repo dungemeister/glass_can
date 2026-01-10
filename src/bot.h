@@ -38,11 +38,12 @@ public:
     explicit TgBot(const std::string& _token)
     :m_token(_token)
     ,m_authorized(false)
-    {  init_requests_table();  }
+    {  initRequestsTable();  }
     
     void loop();
 private:
-    void init_requests_table();
+    void initRequestsTable();
+    void handleText(uint64_t chat_id, const std::string& text);
     json callRequest(TgAPIRequest request, const json& params);
     json callMethod(const std::string& method, RequestType type, const json& params);
     
@@ -65,13 +66,16 @@ private:
     json getAvailableGifts();
 
     //InlineKeyboard
-    json getKeyboardForUser(uint64_t chat_id);
-    json mainMenuKeyboard();
-    json steamMenuKeyboard();
+    json getMenuForUser(uint64_t chat_id);
+    json mainMenu();
+    json steamMenu();
+    json steamAddLinkMenu();
 
     void handleCallbackQuery(const json& callback);
+    
     //DataBase
     void initDatabase();
+    bool addSteamLink(uint64_t chat_id, const std::string& line);
 
 private:
     std::string m_token;
@@ -84,6 +88,10 @@ private:
     
     std::unordered_map<TgAPIRequest, std::tuple<std::string, RequestType>> m_requests_table;
 
-    const std::string c_main_menu_string  = "main_menu";
-    const std::string c_steam_menu_string = "steam_menu";
+    const std::string c_main_menu_string    = "main_menu";
+    const std::string c_steam_menu_string   = "steam_menu";
+    const std::string c_steam_add_string    = "steam_add";
+    const std::string c_steam_delete_string = "steam_delete";
+    const std::string c_steam_list_string   = "steam_list";
+    const std::string c_steam_info_string   = "steam_info";
 };

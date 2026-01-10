@@ -1,9 +1,12 @@
 #pragma once
 #include <unordered_map>
 #include <stdint.h>
+#include <tuple>
+#include <string>
 
 class BotContext{
 public:
+    
     enum BotState{
         MAIN_MENU,
         STEAM_MENU,
@@ -12,12 +15,15 @@ public:
         STEAM_DELETE_LINK,
         STEAM_LIST_LINKS,
     };
-
+    using UserContext = std::tuple<BotState, std::string>;
+    
     BotContext();
 
+    void setUserContext(uint64_t chat_id, UserContext context);
     void switchState(uint64_t chat_id, BotState state);
-    BotState getState(uint64_t chat_id);
+    UserContext getState(uint64_t chat_id);
 
 private:
-    std::unordered_map<uint64_t, BotState> m_user_state;
+    
+    std::unordered_map<uint64_t, UserContext> m_user_state;
 };

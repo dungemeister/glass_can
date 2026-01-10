@@ -108,3 +108,25 @@ std::vector<nlohmann::json> DataBase::query(const std::string& sql){
 
     return rows;
 }
+
+std::vector<nlohmann::json> DataBase::getUserLinks(uint64_t chat_id){
+    auto user_id = getUserId(chat_id);
+    std::stringstream q;
+    q << "SELECT * FROM user_links WHERE user_id = " << chat_id << " ORDER BY id DESC;";
+    auto stats = query(q.str());
+}
+
+bool DataBase::addUserLink(uint64_t chat_id, const std::string& link, const std::string& title){
+    try{
+        auto user_id = getUserId(chat_id);
+        std::stringstream q;
+        q << "INSERT INTO user_links (user_id, url, title) " <<
+             "VALUES (" << user_id << ", '" << link << "', '" << title << "');";
+        exec(q.str());
+        return true;
+    }
+    catch(const std::exception& e){
+        std::cerr << "addUserLink: " << e.what() << std::endl;
+        return false;
+    }
+}
