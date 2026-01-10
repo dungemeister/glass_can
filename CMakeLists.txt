@@ -11,6 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(SOURCES main.cpp
             src/bot.cpp
+            src/bot_context.cpp
             src/db.cpp
             )
 

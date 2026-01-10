@@ -65,6 +65,7 @@ private:
     json getAvailableGifts();
 
     //InlineKeyboard
+    json getKeyboardForUser(uint64_t chat_id);
     json mainMenuKeyboard();
     //DataBase
     void initDatabase();
