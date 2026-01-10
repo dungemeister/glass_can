@@ -12,5 +12,8 @@ void BotContext::switchState(uint64_t chat_id, BotState state){
 }
 
 BotContext::UserContext BotContext::getState(uint64_t chat_id){
+    if(m_user_state.find(chat_id) == m_user_state.end()){
+        return std::make_tuple(BotState::INVALID, "");
+    }
     return m_user_state[chat_id];
 }

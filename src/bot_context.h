@@ -8,12 +8,15 @@ class BotContext{
 public:
     
     enum BotState{
+        INVALID,
         MAIN_MENU,
         STEAM_MENU,
         OTHER_MENU,
         STEAM_ADD_LINK,
         STEAM_DELETE_LINK,
+        STEAM_DELETE_ALL_LINKS,
         STEAM_LIST_LINKS,
+        STEAM_INFO_LINKS,
     };
     using UserContext = std::tuple<BotState, std::string>;
     

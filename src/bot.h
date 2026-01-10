@@ -5,6 +5,7 @@
 
 #include "db.h"
 #include "bot_context.h"
+#include "price_overview_parser.h"
 
 #include "nlohmann/json.hpp"
 #include <tuple>
@@ -76,7 +77,7 @@ private:
     //DataBase
     void initDatabase();
     bool addSteamLink(uint64_t chat_id, const std::string& line);
-
+    bool deleteSteamLink(uint64_t, const std::string& title);
 private:
     std::string m_token;
     std::string m_name;
@@ -94,4 +95,8 @@ private:
     const std::string c_steam_delete_string = "steam_delete";
     const std::string c_steam_list_string   = "steam_list";
     const std::string c_steam_info_string   = "steam_info";
+    
+    const std::string c_steam_app_id        = "730"; //CS2 app id
+
+    const PriceOverview::SteamCurrency c_steam_currency = PriceOverview::SteamCurrency::eUSD; //Current steam currency
 };

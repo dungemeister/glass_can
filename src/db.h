@@ -19,6 +19,7 @@ public:
 
     std::vector<nlohmann::json> getUserLinks(uint64_t chat_id);
     bool addUserLink(uint64_t chat_id, const std::string& link, const std::string& title);
+    bool deleteUserLink(uint64_t chat_id, const std::string& title);
 
 private:
     std::string m_file;

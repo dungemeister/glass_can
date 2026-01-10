@@ -1,8 +1,8 @@
 #include "bot.h"
+#include "misc.h"
 
 #include <thread>
 #include <fstream>
-
 void TgBot::initRequestsTable(){
     m_requests_table = {
         {TgAPIRequest::eGET_UPDATES,           {"getUpdates",            RequestType::eGET}},
@@ -112,16 +112,23 @@ json TgBot::getUpdates(uint64_t offset){
 }
 
 bool TgBot::sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard={}, ParseMode mode=ParseMode::eMARKDOWN_V2){
+    
+    auto prepared_text = StringMisc::escapeString(text);
     json params = {
         {"chat_id", chat_id},
-        {"text", text},
+        {"text", prepared_text},
         {"parse_mode", (mode == ParseMode::eMARKDOWN_V2)? "MarkdownV2":"HTML"},
     };
     if(!inline_keyboard.empty())
         params["reply_markup"] = inline_keyboard;
-
-    auto result = callRequest(TgAPIRequest::eSEND_MESSAGE, params);
-    return true;
+    try{
+        callRequest(TgAPIRequest::eSEND_MESSAGE, params);
+        return true;
+    }
+    catch(const std::exception& e){
+        std::cerr << "sendMessage: " << e.what() << std::endl;
+        return false;
+    }
 }
 
 void TgBot::getBotname(){
@@ -151,7 +158,7 @@ void TgBot::handleText(uint64_t chat_id, const std::string& text){
     auto user_state = std::get<0>(user_context);
     auto username = std::get<1>(user_context);
 
-    std::cout << "#" << chat_id << ": " << text << std::endl;
+    std::cout << "#" << username << ": " << text << std::endl;
     if(text == "ping"){
         std::string msg = "*pong*";
 
@@ -170,6 +177,15 @@ void TgBot::handleText(uint64_t chat_id, const std::string& text){
             }
             else{
                 sendMessage(chat_id, "Ссылка добавлена", steamMenu());
+            }
+        break;
+
+        case BotContext::BotState::STEAM_DELETE_LINK:
+            if(auto res = deleteSteamLink(chat_id, text); !res){
+                sendMessage(chat_id, "Ошибка удаления", steamMenu());
+            }
+            else{
+                sendMessage(chat_id, "Ссылка удалена", steamMenu());
             }
         break;
     }
@@ -203,6 +219,9 @@ void TgBot::loop(){
                 auto chat_id = message["chat"]["id"].get<uint64_t>();
 
                 auto user_state = m_context.getState(chat_id);
+                if(std::get<0>(user_state) == BotContext::BotState::INVALID){
+                    m_context.setUserContext(chat_id, std::make_tuple(BotContext::BotState::MAIN_MENU, username));
+                }
                 auto user_id = m_sqlite_db->addUser(chat_id, username, first_name);
                 //Handling text messages
                 if(message.contains("text")){
@@ -462,9 +481,13 @@ void TgBot::handleCallbackQuery(const json& callback){
             if(data.get<std::string>() == c_steam_list_string){
                 auto links = m_sqlite_db->getUserLinks(chat_id);
                 for(auto& link: links){
-                    std::cout << link.dump() << std::endl;
+                    std::stringstream out;
+                    out << link["title"] << ": " << link["url"] << std::endl;
+                    std::cout << out.str();
+                    sendMessage(chat_id, out.str());
                 }
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_LIST_LINKS);
+                sendMessage(chat_id, "*Steam Menu*", steamMenu());
             }
             if(data.get<std::string>() == c_steam_add_string){
                 callMethod("editMessageText", RequestType::ePOST, {
@@ -479,6 +502,56 @@ void TgBot::handleCallbackQuery(const json& callback){
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_ADD_LINK);
                 
             }
+            if(data.get<std::string>() == c_steam_info_string){
+                auto links = m_sqlite_db->getUserLinks(chat_id);
+                for(const auto& link: links){
+                    auto temp = link["url"].get<std::string>();
+                    auto index = temp.rfind("/");
+                    const std::string item_hash_name =  temp.substr(index + 1);
+                    auto res = PriceOverview::Parser::getSteamItemPrice(c_steam_app_id, item_hash_name, c_steam_currency);
+                    auto data = json::parse(res);
+
+                    std::stringstream out;
+                    if(data["success"].get<bool>()){
+
+                        // std::string currency = (c_steam_currency == PriceOverview::SteamCurrency::eUSD)?"$":"Rub";
+                        std::string currency = "";
+
+                        out << "*" << item_hash_name << "*\n" <<
+                                "Начальная цена на продажу: *" << data["lowest_price"] << currency << "*\n" <<
+                                "Медианная цена: *" << data["median_price"] << currency << "*\n" <<
+                                "Объем лотов: *" << data["volume"] << "*" << std::endl;
+                    }
+                    else{
+                        out << "*" << item_hash_name << "*." << "Ошибка выполнения запроса: " << data["error"] << std::endl;
+                    }
+                    sendMessage(chat_id, out.str());
+                }
+                sendMessage(chat_id, "*Steam Menu*", steamMenu());
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
+
+            }
+            if(data.get<std::string>() == c_steam_delete_string){
+                auto links = m_sqlite_db->getUserLinks(chat_id);
+                if(links.size() <= 0){
+                    sendMessage(chat_id, "Список пустой", steamMenu());
+                    m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
+                }
+                else{
+
+                    json titles_menu = {{"inline_keyboard", { {  }, } }};
+                    for(auto& link: links){
+                        std::stringstream out;
+                        out << link["title"] << ": " << link["url"] << std::endl;
+                        std::cout << out.str();
+                        sendMessage(chat_id, out.str());
+                    }
+
+                    sendMessage(chat_id, "Выбери какую ссылку удалить", steamMenu());
+                    m_context.switchState(chat_id, BotContext::BotState::STEAM_DELETE_LINK);
+                }
+
+            }
         }
     }
     catch(const std::exception& e){
@@ -487,8 +560,14 @@ void TgBot::handleCallbackQuery(const json& callback){
 }
 
 bool TgBot::addSteamLink(uint64_t chat_id, const std::string& line){
-    auto& link = line;
-    auto title = "temp";
-    
+    auto sep_index = line.find("-");
+    auto link = line.substr(0, sep_index - 1);
+    auto title = line.substr(sep_index + 2);
+    std::cout << "Adding to " << chat_id << " " << link << " " << title << std::endl;
     return m_sqlite_db->addUserLink(chat_id, link, title);
+}
+
+bool TgBot::deleteSteamLink(uint64_t chat_id, const std::string& title){
+    std::cout << "Deleting from " << chat_id << " " << title << std::endl;
+    return m_sqlite_db->deleteUserLink(chat_id, title);
 }

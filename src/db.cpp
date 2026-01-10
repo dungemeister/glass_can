@@ -76,12 +76,13 @@ int64_t DataBase::addUser(int64_t chat_id, const std::string& username = "",
 int64_t DataBase::getUserId(int64_t chat_id){
     std::stringstream q;
     q << "SELECT id FROM users WHERE chat_id = " <<
-         chat_id << ";" << std::endl;
+         chat_id << ";";
     auto users = query(q.str());
     if(users.empty()){
         throw std::runtime_error("getUserId: user with chat_id=" + std::to_string(chat_id) + " not found");
     }
-    return std::atol(users[0]["id"].get<std::string>().c_str());
+    auto data = users[0]["id"].get<std::string>();
+    return std::atol(data.c_str());
 }
 
 std::vector<nlohmann::json> DataBase::query(const std::string& sql){
@@ -94,13 +95,12 @@ std::vector<nlohmann::json> DataBase::query(const std::string& sql){
         nlohmann::json row;
         for (int i = 0; i < argc; ++i) {
             // argv[i] == nullptr означает SQL NULL
-            row[col[i]] = argv[i] ? argv[i] : nullptr;
+            row[col[i]] = argv[i] ? argv[i] : "";
         }
         out->push_back(std::move(row));
         return 0; // 0 = продолжать
     };
-
-    if(auto res = sqlite3_exec(m_db, sql.c_str(), cb, &rows, &err); res != SQLITE_OK){
+    if(auto res = sqlite3_exec(m_db, sql.c_str(), cb, &rows, &err);res != SQLITE_OK){
         std::string error_msg = err ? err: "Unknown Error";
         sqlite3_free(err);
         throw std::runtime_error("SQL query error: " + error_msg);
@@ -112,8 +112,9 @@ std::vector<nlohmann::json> DataBase::query(const std::string& sql){
 std::vector<nlohmann::json> DataBase::getUserLinks(uint64_t chat_id){
     auto user_id = getUserId(chat_id);
     std::stringstream q;
-    q << "SELECT * FROM user_links WHERE user_id = " << chat_id << " ORDER BY id DESC;";
+    q << "SELECT * FROM user_links WHERE user_id = " << user_id << " ORDER BY id DESC;";
     auto stats = query(q.str());
+    return stats;
 }
 
 bool DataBase::addUserLink(uint64_t chat_id, const std::string& link, const std::string& title){
@@ -127,6 +128,21 @@ bool DataBase::addUserLink(uint64_t chat_id, const std::string& link, const std:
     }
     catch(const std::exception& e){
         std::cerr << "addUserLink: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool DataBase::deleteUserLink(uint64_t chat_id, const std::string& title){
+    try{
+        auto user_id = getUserId(chat_id);
+        std::stringstream q;
+        q << "DELETE FROM user_links WHERE user_id = " << user_id <<
+             " AND title = '" << title << "';";
+        exec(q.str());
+        return true;
+    }
+    catch(const std::exception& e){
+        std::cerr << "deleteUserLink: " << e.what() << std::endl;
         return false;
     }
 }
