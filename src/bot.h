@@ -78,6 +78,9 @@ private:
     void initDatabase();
     bool addSteamLink(uint64_t chat_id, const std::string& line);
     bool deleteSteamLink(uint64_t, const std::string& title);
+
+    std::string getUserLinkPriceOverview(const json& link);
+    std::string convertUserLinkMinimal(const json& link);
 private:
     std::string m_token;
     std::string m_name;
