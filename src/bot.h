@@ -81,6 +81,7 @@ private:
 
     std::string getUserLinkPriceOverview(const json& link);
     std::string convertUserLinkMinimal(const json& link);
+    nlohmann::json createInlineKeyboard(const std::vector<std::string>& buttons, const std::string& callback_prefix, int rows);
 private:
     std::string m_token;
     std::string m_name;
