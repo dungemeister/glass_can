@@ -24,7 +24,7 @@ public:
 
     void setUserContext(uint64_t chat_id, UserContext context);
     void switchState(uint64_t chat_id, BotState state);
-    UserContext getState(uint64_t chat_id);
+    UserContext getUserContext(uint64_t chat_id);
 
 private:
     

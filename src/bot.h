@@ -49,7 +49,7 @@ private:
     json callMethod(const std::string& method, RequestType type, const json& params);
     
     json getUpdates(uint64_t offset);
-    bool sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard, ParseMode mode);
+    bool sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard, ParseMode mode, bool disable_web_preview);
     void getBotname();
     
     void getMe();

@@ -111,7 +111,7 @@ json TgBot::getUpdates(uint64_t offset){
     }
 }
 
-bool TgBot::sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard={}, ParseMode mode=ParseMode::eMARKDOWN_V2){
+bool TgBot::sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard={}, ParseMode mode=ParseMode::eMARKDOWN_V2, bool disable_web_preview=false){
     
     auto prepared_text = StringMisc::escapeString(text);
     json params = {
@@ -119,6 +119,9 @@ bool TgBot::sendMessage(uint64_t chat_id, const std::string& text, const json& i
         {"text", prepared_text},
         {"parse_mode", (mode == ParseMode::eMARKDOWN_V2)? "MarkdownV2":"HTML"},
     };
+    if(disable_web_preview){
+        params["disable_web_page_preview"] = true;
+    }
     if(!inline_keyboard.empty())
         params["reply_markup"] = inline_keyboard;
     try{
@@ -154,7 +157,7 @@ void TgBot::parseGetMeResponse(json response){
 }
 
 void TgBot::handleText(uint64_t chat_id, const std::string& text){
-    auto user_context = m_context.getState(chat_id);
+    auto user_context = m_context.getUserContext(chat_id);
     auto user_state = std::get<0>(user_context);
     auto username = std::get<1>(user_context);
 
@@ -218,7 +221,7 @@ void TgBot::loop(){
                 std::string first_name = message["chat"]["first_name"];
                 auto chat_id = message["chat"]["id"].get<uint64_t>();
 
-                auto user_state = m_context.getState(chat_id);
+                auto user_state = m_context.getUserContext(chat_id);
                 if(std::get<0>(user_state) == BotContext::BotState::INVALID){
                     m_context.setUserContext(chat_id, std::make_tuple(BotContext::BotState::MAIN_MENU, username));
                 }
@@ -399,7 +402,7 @@ json TgBot::mainMenu(){
 
 
 json TgBot::getMenuForUser(uint64_t chat_id){
-    auto context = m_context.getState(chat_id);
+    auto context = m_context.getUserContext(chat_id);
     auto state = std::get<0>(context);
 
     switch(state){
@@ -452,6 +455,7 @@ void TgBot::handleCallbackQuery(const json& callback){
         auto message_id = callback["message"]["message_id"].get<uint64_t>();
         if(callback.contains("data")){
             auto data = callback["data"];
+            auto user_context = m_context.getUserContext(chat_id);
             auto res = callMethod("answerCallbackQuery", RequestType::ePOST, {
                                     {"callback_query_id", callback["id"]}
                                 });
@@ -480,14 +484,17 @@ void TgBot::handleCallbackQuery(const json& callback){
             }
             if(data.get<std::string>() == c_steam_list_string){
                 auto links = m_sqlite_db->getUserLinks(chat_id);
+                auto username = std::get<1>(user_context);
+                std::cout << "Request " << c_steam_list_string << ": " << username << std::endl;
                 for(auto& link: links){
                     std::stringstream out;
-                    out << link["title"] << ": " << link["url"] << std::endl;
+                    out << "[" << link["title"] << "](" << link["url"] << ")" << std::endl;
                     std::cout << out.str();
-                    sendMessage(chat_id, out.str());
+                    auto prepared = StringMisc::removeQuotes(out.str());
+                    sendMessage(chat_id, prepared, {}, eMARKDOWN_V2, true);
                 }
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_LIST_LINKS);
-                sendMessage(chat_id, "*Steam Menu*", steamMenu());
+                sendMessage(chat_id, "*Steam Menu*", steamMenu(), eMARKDOWN_V2, true);
             }
             if(data.get<std::string>() == c_steam_add_string){
                 callMethod("editMessageText", RequestType::ePOST, {
@@ -505,27 +512,28 @@ void TgBot::handleCallbackQuery(const json& callback){
             if(data.get<std::string>() == c_steam_info_string){
                 auto links = m_sqlite_db->getUserLinks(chat_id);
                 for(const auto& link: links){
-                    auto temp = link["url"].get<std::string>();
-                    auto index = temp.rfind("/");
-                    const std::string item_hash_name =  temp.substr(index + 1);
+                    auto url = link["url"].get<std::string>();
+                    auto index = url.rfind("/");
+                    const std::string item_hash_name =  url.substr(index + 1);
                     auto res = PriceOverview::Parser::getSteamItemPrice(c_steam_app_id, item_hash_name, c_steam_currency);
                     auto data = json::parse(res);
 
                     std::stringstream out;
+                    auto markdown_link = StringMisc::createMarkdownLink(url, StringMisc::uriToString(item_hash_name));
                     if(data["success"].get<bool>()){
 
                         // std::string currency = (c_steam_currency == PriceOverview::SteamCurrency::eUSD)?"$":"Rub";
                         std::string currency = "";
 
-                        out << "*" << item_hash_name << "*\n" <<
-                                "Начальная цена на продажу: *" << data["lowest_price"] << currency << "*\n" <<
-                                "Медианная цена: *" << data["median_price"] << currency << "*\n" <<
-                                "Объем лотов: *" << data["volume"] << "*" << std::endl;
+                        out << markdown_link << 
+                               "Начальная цена на продажу: *" << data["lowest_price"] << currency << "*\n" <<
+                               "Медианная цена: *" << data["median_price"] << currency << "*\n" <<
+                               "Объем лотов: *" << data["volume"] << "*" << std::endl;
                     }
                     else{
                         out << "*" << item_hash_name << "*." << "Ошибка выполнения запроса: " << data["error"] << std::endl;
                     }
-                    sendMessage(chat_id, out.str());
+                    sendMessage(chat_id, out.str(), {}, eMARKDOWN_V2, true);
                 }
                 sendMessage(chat_id, "*Steam Menu*", steamMenu());
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
