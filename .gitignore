@@ -2,3 +2,5 @@ build/*
 *.ogg
 *.db
 charts/*
+*.key
+*.cookie
