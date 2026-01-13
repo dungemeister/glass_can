@@ -365,6 +365,77 @@ bool TgBot::uploadTelegramPhoto(const std::string file_path){
     return false;
 }
 
+std::string TgBot::sendLocalFile(const std::string& token, long long chat_id, const std::string& file_path, const std::string& caption, const std::string& method){
+    std::ifstream file(file_path, std::ios::binary | std::ios::ate);
+    if (!file.is_open()) {
+        throw std::runtime_error("File not found: " + file_path);
+    }
+    
+    curlpp::Cleanup cleanup;
+    curlpp::Easy request;
+    
+    std::string url = "https://api.telegram.org/bot" + token + "/" + method;
+    
+    //TODO:
+    throw std::runtime_error("sendLocalFile not implemented yet");
+    
+    try {
+        request.setOpt(curlpp::options::Url(url));
+        request.setOpt(curlpp::options::Post(true));
+        // request.setOpt(curlpp::options::PostFields(multipart_body.str()));
+        // request.setOpt(curlpp::options::HttpHeader(headers));
+        
+        std::ostringstream response;
+        request.setOpt(curlpp::options::WriteStream(&response));
+        
+        request.perform();
+        return response.str();
+        
+    } catch (curlpp::RuntimeError& e) {
+        throw std::runtime_error("curlpp: " + std::string(e.what()));
+    }
+}
+
+std::string TgBot::sendPhotoFile(long long chat_id,  const std::string& file_path, const std::string& caption = "") {
+    
+    std::filesystem::path path(file_path);
+    if (!std::filesystem::exists(path)) {
+        return "{\"ok\":false,\"error\":\"File not found\"}";
+    }
+    
+    try {
+        curlpp::Cleanup cleanup;
+        curlpp::Easy request;
+        std::ostringstream response;
+        
+        request.setOpt(curlpp::options::Url("https://api.telegram.org/bot" + m_token + "/sendPhoto"));
+        request.setOpt(curlpp::options::Timeout(30));
+        request.setOpt(curlpp::options::Verbose(false));
+        
+        curlpp::Forms formParts;
+        formParts.push_back(new curlpp::FormParts::Content("chat_id", std::to_string(chat_id)));
+        formParts.push_back(new curlpp::FormParts::File("photo", file_path));
+        
+        if (!caption.empty()) {
+            formParts.push_back(new curlpp::FormParts::Content("caption", caption));
+        }
+        
+        request.setOpt(curlpp::options::HttpPost(formParts));
+        request.setOpt(curlpp::options::WriteStream(&response));
+        
+        request.perform();
+        
+        return response.str();;
+        
+    } catch (curlpp::RuntimeError& e) {
+        return "{\"ok\":false,\"error\":\"curlpp: " + std::string(e.what()) + "\"}";
+    } catch (curlpp::LogicError& e) {
+        return "{\"ok\":false,\"error\":\"curlpp logic: " + std::string(e.what()) + "\"}";
+    } catch (std::exception& e) {
+        return "{\"ok\":false,\"error\":\"" + std::string(e.what()) + "\"}";
+    }
+}
+
 bool TgBot::setChatMenuButton(uint64_t chat_id){
     try{
         json params = {
@@ -430,6 +501,7 @@ json TgBot::getMenuForUser(uint64_t chat_id){
         case BotContext::BotState::STEAM_LIST_LINKS:
             return {};
     }
+    return {};
 }
 
 json TgBot::steamMenu(){
@@ -545,7 +617,18 @@ void TgBot::handleCallbackQuery(const json& callback){
                 if(links.size() > 0){
                     for(const auto& link: links){
                         auto out = getUserLinkPriceOverview(link);
-                        getUserItemChart(link);
+                        try {
+                            auto png_path = getUserItemChart(link);
+                            auto response = sendPhotoFile(chat_id, png_path, "График \"" + link["title"].get<std::string>() + "\"");
+                            auto json = nlohmann::json::parse(response);
+                            if (json["ok"].get<bool>()) {
+                                std::cout << "✅ Фото отправлено! file_id: " << json["result"]["photo"][0]["file_id"] << std::endl;
+                            } else {
+                                std::cout << "❌ Ошибка: " << json["description"] << std::endl;
+                            }
+                        } catch (...) {
+                            std::cout << " JSON парсинг ошибка" << std::endl;
+                        }
                         sendMessage(chat_id, out, {}, eMARKDOWN_V2, true);
                     }
                     sendMessage(chat_id, "*Steam Menu*", steamMenu());
@@ -675,7 +758,8 @@ std::string TgBot::getUserItemChart(const json& link){
         std::string gnuplot_script_file = assets_dir.str() + "/" + market_hash_name + "_" + PriceHistory::getTimePeriodString(time_period) +".gp";
 
         auto res = GnuplotChart::createChartPngImage(plots, points_data_file, gnuplot_script_file, png_file, time_period);
-        return png_file;
+        auto abs_path = FilesystemManager::abs_path(png_file);
+        return abs_path;
     }
     catch(const std::exception& e){
         std::cerr << "ERROR: getUserItemChart: " << e.what() << std::endl;

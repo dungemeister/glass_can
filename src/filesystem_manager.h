@@ -17,4 +17,7 @@ namespace FilesystemManager{
         return std::filesystem::remove_all(path);
     }
 
+    static inline std::string abs_path(const std::string& rel_path){
+        return std::filesystem::absolute(rel_path);
+    }
 }; //namespace FilesystemManager

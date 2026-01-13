@@ -65,7 +65,9 @@ private:
     
     bool downloadTelegramFile(const std::string& file_path, const std::string& save_as);
     bool uploadTelegramPhoto(const std::string file_path);
-    
+    std::string sendLocalFile(const std::string& token, long long chat_id, const std::string& file_path, const std::string& caption, const std::string& method);
+    std::string sendPhotoFile(long long chat_id,  const std::string& file_path, const std::string& caption);
+
     bool setChatMenuButton(uint64_t chat_id);
     json getAvailableGifts();
 
@@ -108,4 +110,6 @@ private:
     const std::string c_steam_app_id        = "730"; //CS2 app id
 
     const PriceOverview::SteamCurrency c_steam_currency = PriceOverview::SteamCurrency::eUSD; //Current steam currency
+
+    
 };
