@@ -1,3 +1,4 @@
 build/*
 *.ogg
 *.db
+charts/*

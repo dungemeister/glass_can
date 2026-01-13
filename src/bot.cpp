@@ -1,5 +1,6 @@
 #include "bot.h"
 #include "misc.h"
+#include "filesystem_manager.h"
 
 #include <thread>
 #include <fstream>
@@ -359,6 +360,11 @@ bool TgBot::downloadTelegramFile(const std::string& file_path, const std::string
     }
 }
 
+bool TgBot::uploadTelegramPhoto(const std::string file_path){
+
+    return false;
+}
+
 bool TgBot::setChatMenuButton(uint64_t chat_id){
     try{
         json params = {
@@ -539,8 +545,10 @@ void TgBot::handleCallbackQuery(const json& callback){
                 if(links.size() > 0){
                     for(const auto& link: links){
                         auto out = getUserLinkPriceOverview(link);
+                        getUserItemChart(link);
                         sendMessage(chat_id, out, {}, eMARKDOWN_V2, true);
                     }
+                    sendMessage(chat_id, "*Steam Menu*", steamMenu());
                 }
                 else{
 
@@ -646,4 +654,31 @@ nlohmann::json TgBot::createInlineKeyboard(const std::vector<std::string>& butto
     }
     
     return keyboard;
+}
+
+std::string TgBot::getUserItemChart(const json& link){
+    try{
+        auto market_hash_name = StringMisc::getUriNameFromSteamLink(link["url"].get<std::string>());
+        auto item_name = StringMisc::uriToString(market_hash_name);
+        auto time_period = PriceHistory::eTimePeriod::MONTH;
+
+        std::stringstream assets_dir;
+        assets_dir << "charts/" << item_name;
+        auto filesystem_res = FilesystemManager::rm_rf(assets_dir.str() + "/*");
+        filesystem_res = FilesystemManager::mkdir(assets_dir.str());
+        
+        auto plots = PriceHistory::getPriceHistory(market_hash_name, time_period);
+        std::cout << "For " << item_name << " found points: " << plots.size() << std::endl;
+
+        std::string points_data_file = assets_dir.str() + "/" + market_hash_name + "_data";
+        std::string png_file = assets_dir.str() + "/" + market_hash_name + "_" + PriceHistory::getTimePeriodString(time_period) + ".png";
+        std::string gnuplot_script_file = assets_dir.str() + "/" + market_hash_name + "_" + PriceHistory::getTimePeriodString(time_period) +".gp";
+
+        auto res = GnuplotChart::createChartPngImage(plots, points_data_file, gnuplot_script_file, png_file, time_period);
+        return png_file;
+    }
+    catch(const std::exception& e){
+        std::cerr << "ERROR: getUserItemChart: " << e.what() << std::endl;
+        return {};
+    }
 }

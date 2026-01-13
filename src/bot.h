@@ -6,6 +6,8 @@
 #include "db.h"
 #include "bot_context.h"
 #include "price_overview_parser.h"
+#include "price_history_parser.h"
+#include "gnuplot_chart.h"
 
 #include "nlohmann/json.hpp"
 #include <tuple>
@@ -62,7 +64,8 @@ private:
     json getFile(const std::string& file_id);
     
     bool downloadTelegramFile(const std::string& file_path, const std::string& save_as);
-
+    bool uploadTelegramPhoto(const std::string file_path);
+    
     bool setChatMenuButton(uint64_t chat_id);
     json getAvailableGifts();
 
@@ -82,6 +85,8 @@ private:
     std::string getUserLinkPriceOverview(const json& link);
     std::string convertUserLinkMinimal(const json& link);
     nlohmann::json createInlineKeyboard(const std::vector<std::string>& buttons, const std::string& callback_prefix, int rows);
+
+    std::string getUserItemChart(const json& link);
 private:
     std::string m_token;
     std::string m_name;
