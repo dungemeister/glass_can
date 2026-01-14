@@ -33,7 +33,21 @@ namespace PriceHistory{
             case eTimePeriod::ALL_TIME:
                 return "all_time";
         }
+        return "unknown";
     }
+
+    static std::string getCookieFromFile(const std::string& filepath){
+        std::string web_cookie;
+        std::fstream cookie_file(filepath);
+        if(!cookie_file.is_open()){
+            std::cerr <<"Fail to open " << filepath << std::endl;
+            return {};
+        }
+        while(std::getline(cookie_file, web_cookie)){}
+        
+        return web_cookie;
+    }
+
     static std::vector<PricePoint> parsePriceHistoryJson(const std::string& body, eTimePeriod period) {
         nlohmann::json j = nlohmann::json::parse(body);
         std::vector<PricePoint> out;
@@ -84,7 +98,8 @@ namespace PriceHistory{
         std::string url = "https://steamcommunity.com/market/pricehistory/?"
             "appid=730&market_hash_name=" + market_hash_name + "&currency=1";
         
-        std::string cookies = "steamLoginSecure=76561198064492302||eyAidHlwIjogIkpXVCIsICJhbGciOiAiRWREU0EiIH0.eyAiaXNzIjogInI6MDAxN18yNzg3M0Q2OF9GQ0UxNiIsICJzdWIiOiAiNzY1NjExOTgwNjQ0OTIzMDIiLCAiYXVkIjogWyAid2ViOmNvbW11bml0eSIgXSwgImV4cCI6IDE3NjgzMTc4NDMsICJuYmYiOiAxNzU5NTg5NjY5LCAiaWF0IjogMTc2ODIyOTY2OSwgImp0aSI6ICIwMDE5XzI3ODczRDY5X0NERTk2IiwgIm9hdCI6IDE3NjgyMTgyMTUsICJydF9leHAiOiAxNzg2NDU2NjkzLCAicGVyIjogMCwgImlwX3N1YmplY3QiOiAiOTIuNTQuMjA0LjExNiIsICJpcF9jb25maXJtZXIiOiAiOTIuNTQuMjA0LjExNiIgfQ.voQ3ifqdTsD4MkM257e8BaSthU3FrESA7vlPavw-dtOm1W1fSE5uqBGRQSSIIBnWNn2b01VyO9cc7ejDU74_Dw;"
+        getCookieFromFile("web.cookie");
+        std::string cookies = "steamLoginSecure=76561198064492302||eyAidHlwIjogIkpXVCIsICJhbGciOiAiRWREU0EiIH0.eyAiaXNzIjogInI6MDAxN18yNzg3M0Q2OF9GQ0UxNiIsICJzdWIiOiAiNzY1NjExOTgwNjQ0OTIzMDIiLCAiYXVkIjogWyAid2ViOmNvbW11bml0eSIgXSwgImV4cCI6IDE3Njg0MDM2NzQsICJuYmYiOiAxNzU5Njc3MjA3LCAiaWF0IjogMTc2ODMxNzIwNywgImp0aSI6ICIwMDE5XzI3ODczRDc5XzRCRTE3IiwgIm9hdCI6IDE3NjgyMTgyMTUsICJydF9leHAiOiAxNzg2NDU2NjkzLCAicGVyIjogMCwgImlwX3N1YmplY3QiOiAiOTIuNTQuMjA0LjExNiIsICJpcF9jb25maXJtZXIiOiAiOTIuNTQuMjA0LjExNiIgfQ.qTmZqm9fmrvj3fgHGHmXLA347uuRMSnJErdeXUlSwPgfxDVg1Wp8ZDBOWy3OfqbyjijfamYMLOhHI8DxSimgAQ;"
                             "sessionid=d343d1419729e399cf66c063";
 
         curlpp::Easy req;
@@ -136,4 +151,6 @@ namespace PriceHistory{
     static std::vector<PricePoint> getPriceHistory(const std::string& market_hash_name, eTimePeriod period = eTimePeriod::ALL_TIME){
         return parsePriceHistoryJson(pricehistory(market_hash_name), period);
     }
+
+
 }; //namespace PriceHistory

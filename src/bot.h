@@ -51,7 +51,7 @@ private:
     json callMethod(const std::string& method, RequestType type, const json& params);
     
     json getUpdates(uint64_t offset);
-    bool sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard, ParseMode mode, bool disable_web_preview);
+    bool sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard, ParseMode mode, bool disable_web_preview, const std::string& espace_symbols);
     void getBotname();
     
     void getMe();
@@ -84,7 +84,7 @@ private:
     bool addSteamLink(uint64_t chat_id, const std::string& line);
     bool deleteSteamLink(uint64_t, const std::string& title);
 
-    std::string getUserLinkPriceOverview(const json& link);
+    json getUserLinkPriceOverview(const json& link);
     std::string convertUserLinkMinimal(const json& link);
     nlohmann::json createInlineKeyboard(const std::vector<std::string>& buttons, const std::string& callback_prefix, int rows);
 

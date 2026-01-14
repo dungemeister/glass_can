@@ -1,5 +1,5 @@
 #include "bot.h"
-#include "misc.h"
+#include "string_misc.h"
 #include "filesystem_manager.h"
 
 #include <thread>
@@ -112,9 +112,11 @@ json TgBot::getUpdates(uint64_t offset){
     }
 }
 
-bool TgBot::sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard={}, ParseMode mode=ParseMode::eMARKDOWN_V2, bool disable_web_preview=false){
+bool TgBot::sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard={}, ParseMode mode=ParseMode::eMARKDOWN_V2, bool disable_web_preview=false,
+                       const std::string& espace_symbols="_~>#+-=|{}.!"){
     
-    auto prepared_text = StringMisc::escapeString(text);
+    auto prepared_text = StringMisc::escapeString(text, espace_symbols);
+    std::cout << prepared_text << std::endl;
     json params = {
         {"chat_id", chat_id},
         {"text", prepared_text},
@@ -414,6 +416,7 @@ std::string TgBot::sendPhotoFile(long long chat_id,  const std::string& file_pat
         
         curlpp::Forms formParts;
         formParts.push_back(new curlpp::FormParts::Content("chat_id", std::to_string(chat_id)));
+        formParts.push_back(new curlpp::FormParts::Content("parse_mode", "MarkdownV2"));
         formParts.push_back(new curlpp::FormParts::File("photo", file_path));
         
         if (!caption.empty()) {
@@ -533,23 +536,7 @@ void TgBot::handleCallbackQuery(const json& callback){
         auto message_id = callback["message"]["message_id"].get<uint64_t>();
         auto user_context = m_context.getUserContext(chat_id);
         auto user_bot_state = std::get<0>(user_context);
-        if(user_bot_state == BotContext::BotContext::STEAM_DELETE_LINK){
-            if(callback.contains("data")){
-                std::string data = callback["data"];
-                auto& callback_id = callback["id"];
-                auto res = callMethod("answerCallbackQuery", RequestType::ePOST, {
-                                    {"callback_query_id", callback_id}
-                                });
-                if(auto res = m_sqlite_db->deleteUserLink(chat_id, data); !res){
-                    sendMessage(chat_id, "Ошибка удаления " + data, steamMenu());
-                }
-                else{
-                    sendMessage(chat_id, "Элемент '" + data + "' удален", steamMenu());
-                }
-                m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
-            }
-            return;
-        }
+
 
         if(callback.contains("data")){
             auto& data = callback["data"];
@@ -580,7 +567,7 @@ void TgBot::handleCallbackQuery(const json& callback){
 
                             });
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
-                
+                return;
             }
             //Get user links list from Steam list
             if(data.get<std::string>() == c_steam_list_string){
@@ -596,40 +583,49 @@ void TgBot::handleCallbackQuery(const json& callback){
                 // auto out = StringMisc::createMarkdownLinkTable(links);
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_LIST_LINKS);
                 sendMessage(chat_id, out.str() + "*Steam Menu*", steamMenu(), ParseMode::eMARKDOWN_V2, true);
+                return;
             }
             //Add link from Steam list
             if(data.get<std::string>() == c_steam_add_string){
                 callMethod("editMessageText", RequestType::ePOST, {
                             {"chat_id", chat_id},
                             {"message_id", message_id},
-                            {"text", "*Steam Add Link Menu*\n Отправь ссылку для отслеживания в формате 'https://example\\.com \\- CS2 Spectrum case'"},
+                            {"text", "*Steam Add Link Menu*\n Отправь ссылку для отслеживания в формате 'https://example\\.com \\# CS2 Spectrum case'"},
                             {"parse_mode", "MarkdownV2"},
                             {"reply_markup", steamAddLinkMenu()}
 
                             });
                 
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_ADD_LINK);
-                
+                return;
             }
             //Get info from Steam list
             if(data.get<std::string>() == c_steam_info_string){
                 auto links = m_sqlite_db->getUserLinks(chat_id);
                 if(links.size() > 0){
                     for(const auto& link: links){
-                        auto out = getUserLinkPriceOverview(link);
+                        auto markdown_link = StringMisc::createMarkdownLink(link["url"], StringMisc::escapeString(StringMisc::uriToString(link["title"])));
+                        auto result = getUserLinkPriceOverview(link);
+                        auto item_name = StringMisc::escapeString(result["caption"].get<std::string>(), "-(){}|.,=");
                         try {
                             auto png_path = getUserItemChart(link);
-                            auto response = sendPhotoFile(chat_id, png_path, "График \"" + link["title"].get<std::string>() + "\"");
+
+                            std::stringstream caption;
+                            caption << "График \"" << item_name << "\"\n" <<
+                                       markdown_link << "\n" <<
+                                       StringMisc::escapeString(result["data"]) << std::endl;
+                            std::cout << caption.str();
+                            auto response = sendPhotoFile(chat_id, png_path, caption.str());
+
                             auto json = nlohmann::json::parse(response);
                             if (json["ok"].get<bool>()) {
-                                std::cout << "✅ Фото отправлено! file_id: " << json["result"]["photo"][0]["file_id"] << std::endl;
+                                std::cout << "Photo sent with file_id: " << json["result"]["photo"][0]["file_id"] << std::endl;
                             } else {
-                                std::cout << "❌ Ошибка: " << json["description"] << std::endl;
+                                std::cerr << "Error: " << json["description"] << std::endl;
                             }
                         } catch (...) {
-                            std::cout << " JSON парсинг ошибка" << std::endl;
+                            std::cerr << " JSON парсинг ошибка" << std::endl;
                         }
-                        sendMessage(chat_id, out, {}, eMARKDOWN_V2, true);
                     }
                     sendMessage(chat_id, "*Steam Menu*", steamMenu());
                 }
@@ -638,7 +634,7 @@ void TgBot::handleCallbackQuery(const json& callback){
                     sendMessage(chat_id, "Список пуст\n*Steam Menu*", steamMenu());
                 }
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
-
+                return;
             }
 
             //Delete from Steam list
@@ -655,11 +651,30 @@ void TgBot::handleCallbackQuery(const json& callback){
                         buttons.emplace_back(title);
                     }
                     auto keyboard = createInlineKeyboard(buttons, "", 2);
+                    keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_menu_string}} });
                     sendMessage(chat_id, "Выбери какую ссылку удалить", keyboard);
+                    // sendMessage(chat_id, "*Steam Menu*", steamMenu());
                     m_context.switchState(chat_id, BotContext::BotState::STEAM_DELETE_LINK);
                 }
-
+                return;
             }
+        }
+        if(user_bot_state == BotContext::BotContext::STEAM_DELETE_LINK){
+            if(callback.contains("data")){
+                std::string data = callback["data"];
+                auto& callback_id = callback["id"];
+                auto res = callMethod("answerCallbackQuery", RequestType::ePOST, {
+                                    {"callback_query_id", callback_id}
+                                });
+                if(auto res = m_sqlite_db->deleteUserLink(chat_id, data); !res){
+                    sendMessage(chat_id, "Ошибка удаления " + data, steamMenu());
+                }
+                else{
+                    sendMessage(chat_id, "Элемент '" + data + "' удален", steamMenu());
+                }
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
+            }
+            return;
         }
     }
     catch(const std::exception& e){
@@ -668,7 +683,7 @@ void TgBot::handleCallbackQuery(const json& callback){
 }
 
 bool TgBot::addSteamLink(uint64_t chat_id, const std::string& line){
-    auto sep_index = line.find("-");
+    auto sep_index = line.find("#");
     auto link = line.substr(0, sep_index - 1);
     auto title = line.substr(sep_index + 2);
     std::cout << "Adding to " << chat_id << " " << link << " " << title << std::endl;
@@ -680,12 +695,13 @@ bool TgBot::deleteSteamLink(uint64_t chat_id, const std::string& title){
     return m_sqlite_db->deleteUserLink(chat_id, title);
 }
 
-std::string TgBot::getUserLinkPriceOverview(const json& link){
+json TgBot::getUserLinkPriceOverview(const json& link){
     auto url = link["url"].get<std::string>();
     auto index = url.rfind("/");
     const std::string item_hash_name =  url.substr(index + 1);
     auto res = PriceOverview::Parser::getSteamItemPrice(c_steam_app_id, item_hash_name, c_steam_currency);
     auto data = json::parse(res);
+    json result;
 
     std::stringstream out;
     auto markdown_link = StringMisc::createMarkdownLink(url, StringMisc::uriToString(item_hash_name));
@@ -694,15 +710,20 @@ std::string TgBot::getUserLinkPriceOverview(const json& link){
         // std::string currency = (c_steam_currency == PriceOverview::SteamCurrency::eUSD)?"$":"Rub";
         std::string currency = "";
 
-        out << markdown_link << "\n" <<
-                "Начальная цена на продажу: *" << data["lowest_price"] << currency << "*\n" <<
+        out <<  "Начальная цена на продажу: *" << data["lowest_price"] << currency << "*\n" <<
                 "Медианная цена: *" << data["median_price"] << currency << "*\n" <<
                 "Объем лотов: *" << data["volume"] << "*" << std::endl;
+        result["ok"] = true;
     }
     else{
         out << "*" << item_hash_name << "*." << "Ошибка выполнения запроса: " << data["error"] << std::endl;
+        result["ok"] = false;
     }
-    return out.str();
+    result["caption"] = StringMisc::uriToString(item_hash_name);
+    result["url"] = url;
+    result["data"] = out.str();
+
+    return result;
 }
 
 std::string TgBot::convertUserLinkMinimal(const json& link){

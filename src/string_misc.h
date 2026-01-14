@@ -9,7 +9,7 @@ namespace StringMisc{
         
         for (char c : input) {
             if (chars.find(c) != std::string::npos) {
-                result += '\\';
+                result += R"(\)";
             }
             result += c;
         }
