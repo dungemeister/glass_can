@@ -5,6 +5,7 @@
 #include "nlohmann/json.hpp"
 
 #include "user_context.h"
+#include "string_misc.h"
 
 class DataBase{
 public:

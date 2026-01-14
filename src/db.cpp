@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sstream>
 
+
 DataBase::DataBase(const std::string& file)
 :m_file(file)
 {
@@ -41,8 +42,8 @@ void DataBase::initSchema(){
 
             CREATE TABLE items_buy_info (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                chat_id INTEGER NOT NULL,
-                url TEXT NOT NULL UNIQUE,
+                user_id INTEGER NOT NULL,
+                url TEXT NOT NULL,
                 title TEXT,
                 buy_price FLOAT NOT NULL,
                 amount INTEGER NOT NULL,
@@ -178,9 +179,10 @@ bool DataBase::addUserItemBuyInfo(uint64_t chat_id, const UserContext::ItemBuyIn
 
         auto user_id = getUserId(chat_id);
         auto row = getUserLinkByTitle(chat_id, info.title);
+
         std::stringstream q;
         q << "INSERT INTO items_buy_info (user_id, url, title, buy_price, amount, date) " <<
-             "VALUES (" << user_id << ", '" << row["url"] << "', '" << info.title << "', '" <<
+             "VALUES (" << user_id << ", '" << StringMisc::removeQuotes(row["url"]) << "', '" << info.title << "', '" <<
                            info.buy_price << "', '" << info.amount << "', '" << info.buy_date << "');";
         exec(q.str());
         return true;

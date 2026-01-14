@@ -1,8 +1,11 @@
 #pragma once
 #include <string>
+#include <iostream>
+#include "nlohmann/json.hpp"
 
 namespace StringMisc{
 
+    using json = nlohmann::json;
     static std::string escapeString(const std::string& input, const std::string& chars="_~>#+-=|{}.!") {
         std::string result;
         result.reserve(input.size() * 2);
@@ -61,7 +64,7 @@ namespace StringMisc{
         
     }
 
-    std::string getUriNameFromSteamLink(const std::string& url){
+    static std::string getUriNameFromSteamLink(const std::string& url){
         auto index = url.rfind("/");
         return  url.substr(index + 1);
     }
