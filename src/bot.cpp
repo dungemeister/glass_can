@@ -545,8 +545,8 @@ json TgBot::steamMenu(){
                 { {{ "text", "📈Текущая инфа списка"},              {"callback_data", c_steam_info_string}},
                   {{ "text", "➖Удалить из списка"},                {"callback_data", c_steam_delete_string}}},
                 
-                { {{ "text", "📈Добавить данные по закупке"},       {"callback_data", c_steam_add_buy_info_string}},
-                  {{ "text", "➖Удалить данные по закупке"},        {"callback_data", c_steam_delete_buy_info_string}}},
+                { {{ "text", "📈Добавить данные по закупке"},       {"callback_data", c_steam_add_buy_info_string}}},
+                { {{ "text", "➖Удалить данные по закупке"},        {"callback_data", c_steam_delete_buy_info_string}}},
 
                 { {{ "text", "🔄В главное меню"},                   {"callback_data", c_main_menu_string}} },
             }}
