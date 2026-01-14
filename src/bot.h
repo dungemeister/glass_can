@@ -72,7 +72,6 @@ private:
     json getAvailableGifts();
 
     //InlineKeyboard
-    json getMenuForUser(uint64_t chat_id);
     json mainMenu();
     json steamMenu();
     json steamAddLinkMenu();

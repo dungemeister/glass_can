@@ -173,8 +173,7 @@ void TgBot::handleText(uint64_t chat_id, const std::string& text){
     if(text == "/start"){
         m_context.switchState(chat_id, BotContext::BotState::MAIN_MENU);
 
-        auto inline_keyboard = getMenuForUser(chat_id);
-        sendMessage(chat_id, "Hello, @" + username, inline_keyboard);
+        sendMessage(chat_id, "Hello, @" + username, mainMenu());
     }
     switch(user_state){
         case BotContext::BotState::STEAM_ADD_LINK:
@@ -478,33 +477,6 @@ json TgBot::mainMenu(){
                 // { { { "text", "🔥Другой список"},                  {"callback_data", "other_menu"} } },
             }}
     };
-}
-
-
-json TgBot::getMenuForUser(uint64_t chat_id){
-    auto context = m_context.getUserContext(chat_id);
-    auto state = std::get<0>(context);
-
-    switch(state){
-        case BotContext::BotState::MAIN_MENU:
-            return mainMenu();
-
-        case BotContext::BotState::STEAM_MENU:
-            return steamMenu();
-
-        case BotContext::BotState::OTHER_MENU:
-            return {};
-
-        case BotContext::BotState::STEAM_ADD_LINK:
-            return {};
-        
-        case BotContext::BotState::STEAM_DELETE_LINK:
-            return {};
-        
-        case BotContext::BotState::STEAM_LIST_LINKS:
-            return {};
-    }
-    return {};
 }
 
 json TgBot::steamMenu(){
