@@ -8,6 +8,7 @@
 #include "price_overview_parser.h"
 #include "price_history_parser.h"
 #include "gnuplot_chart.h"
+#include "user_context.h"
 
 #include "nlohmann/json.hpp"
 #include <tuple>
@@ -75,6 +76,8 @@ private:
     json mainMenu();
     json steamMenu();
     json steamAddLinkMenu();
+    
+    nlohmann::json createInlineKeyboard(const std::vector<std::string>& buttons, const std::string& callback_prefix, int rows);
 
     void handleCallbackQuery(const json& callback);
     
@@ -85,7 +88,6 @@ private:
 
     json getUserLinkPriceOverview(const json& link);
     std::string convertUserLinkMinimal(const json& link);
-    nlohmann::json createInlineKeyboard(const std::vector<std::string>& buttons, const std::string& callback_prefix, int rows);
 
     std::string getUserItemChart(const json& link);
 private:
@@ -98,13 +100,17 @@ private:
     BotContext m_context;
     
     std::unordered_map<TgAPIRequest, std::tuple<std::string, RequestType>> m_requests_table;
+    std::unordered_map<uint64_t, UserContext::ItemBuyInfo> m_user_buy_item_info;
 
-    const std::string c_main_menu_string    = "main_menu";
-    const std::string c_steam_menu_string   = "steam_menu";
-    const std::string c_steam_add_string    = "steam_add";
-    const std::string c_steam_delete_string = "steam_delete";
-    const std::string c_steam_list_string   = "steam_list";
-    const std::string c_steam_info_string   = "steam_info";
+    const std::string c_main_menu_string                = "main_menu";
+    const std::string c_steam_menu_string               = "steam_menu";
+    const std::string c_steam_add_string                = "steam_add";
+    const std::string c_steam_delete_string             = "steam_delete";
+    const std::string c_steam_list_string               = "steam_list";
+    const std::string c_steam_info_string               = "steam_info";
+
+    const std::string c_steam_add_buy_info_string       = "steam_add_buy_info";
+    const std::string c_steam_delete_buy_info_string    = "steam_delete_buy_info";
     
     const std::string c_steam_app_id        = "730"; //CS2 app id
 

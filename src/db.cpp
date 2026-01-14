@@ -38,6 +38,17 @@ void DataBase::initSchema(){
                 status TEXT DEFAULT 'active',
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
+
+            CREATE TABLE items_buy_info (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER NOT NULL,
+                url TEXT NOT NULL UNIQUE,
+                title TEXT,
+                buy_price FLOAT NOT NULL,
+                amount INTEGER NOT NULL,
+                date TEXT -- YYYY-MM-DD
+            );
+
         )");
     }
     catch(const std::exception& e){
@@ -117,6 +128,14 @@ std::vector<nlohmann::json> DataBase::getUserLinks(uint64_t chat_id){
     return stats;
 }
 
+nlohmann::json DataBase::getUserLinkByTitle(uint64_t chat_id, const std::string& title){
+    auto user_id = getUserId(chat_id);
+    std::stringstream q;
+    q << "SELECT * FROM user_links WHERE user_id = " << user_id << " AND title = '" << title << "';";
+    auto stats = query(q.str());
+    return stats[0];
+}
+
 bool DataBase::addUserLink(uint64_t chat_id, const std::string& link, const std::string& title){
     try{
         auto user_id = getUserId(chat_id);
@@ -143,6 +162,31 @@ bool DataBase::deleteUserLink(uint64_t chat_id, const std::string& title){
     }
     catch(const std::exception& e){
         std::cerr << "deleteUserLink: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool DataBase::addUserItemBuyInfo(uint64_t chat_id, const UserContext::ItemBuyInfo& info){
+    try{
+        // id INTEGER PRIMARY KEY AUTOINCREMENT,
+        // user_id INTEGER NOT NULL,
+        // url TEXT NOT NULL UNIQUE,
+        // title TEXT,
+        // buy_price FLOAT NOT NULL,
+        // amount INTEGER NOT NULL,
+        // date TEXT -- YYYY-MM-DD
+
+        auto user_id = getUserId(chat_id);
+        auto row = getUserLinkByTitle(chat_id, info.title);
+        std::stringstream q;
+        q << "INSERT INTO items_buy_info (user_id, url, title, buy_price, amount, date) " <<
+             "VALUES (" << user_id << ", '" << row["url"] << "', '" << info.title << "', '" <<
+                           info.buy_price << "', '" << info.amount << "', '" << info.buy_date << "');";
+        exec(q.str());
+        return true;
+    }
+    catch(const std::exception& e){
+        std::cerr << "addUserItemButInfo: " << e.what() << std::endl;
         return false;
     }
 }

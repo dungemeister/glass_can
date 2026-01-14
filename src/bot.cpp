@@ -175,6 +175,7 @@ void TgBot::handleText(uint64_t chat_id, const std::string& text){
 
         sendMessage(chat_id, "Hello, @" + username, mainMenu());
     }
+    
     switch(user_state){
         case BotContext::BotState::STEAM_ADD_LINK:
             if(auto res = addSteamLink(chat_id, text); !res){
@@ -183,6 +184,7 @@ void TgBot::handleText(uint64_t chat_id, const std::string& text){
             else{
                 sendMessage(chat_id, "Ссылка добавлена", steamMenu());
             }
+            m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
         break;
 
         case BotContext::BotState::STEAM_DELETE_LINK:
@@ -192,6 +194,61 @@ void TgBot::handleText(uint64_t chat_id, const std::string& text){
             else{
                 sendMessage(chat_id, "Ссылка удалена", steamMenu());
             }
+            m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
+        break;
+
+        case BotContext::BotState::STEAM_ADD_LINK_BUY_INFO_BUY_PRICE:
+        {
+            auto& info = m_user_buy_item_info[chat_id];
+            try{
+                std::stringstream price_ss;
+                price_ss << text;
+                price_ss >> m_user_buy_item_info[chat_id].buy_price;
+
+                sendMessage(chat_id, "Информация добавлена");
+                json keyboard;
+                keyboard["inline_keyboard"] = json::array();
+                keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_menu_string}} });
+                sendMessage(chat_id,
+                            "Введи купленное количество предметов по цене " + std::to_string(m_user_buy_item_info[chat_id].buy_price),
+                            keyboard);
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_ADD_LINK_BUY_INFO_AMOUNT);
+
+            }
+            catch(...){
+                sendMessage(chat_id, "Ошибка добавления информации", steamMenu());
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
+
+            }
+
+        }
+        break;
+
+        case BotContext::BotState::STEAM_ADD_LINK_BUY_INFO_AMOUNT:
+        {
+            auto& info = m_user_buy_item_info[chat_id];
+            try{
+                std::stringstream amount_ss;
+                amount_ss << text;
+                amount_ss >> m_user_buy_item_info[chat_id].amount;
+
+                if(auto res = m_sqlite_db->addUserItemBuyInfo(chat_id, info); !res){
+                    sendMessage(chat_id, "Ошибка добавления информации. DB error", steamMenu());
+                }
+                else{
+
+                    sendMessage(chat_id, "Информация о покупках добавлена", steamMenu());
+                }
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
+
+            }
+            catch(...){
+                sendMessage(chat_id, "Ошибка добавления информации", steamMenu());
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
+
+            }
+
+        }
         break;
     }
 }
@@ -482,13 +539,16 @@ json TgBot::mainMenu(){
 json TgBot::steamMenu(){
     return {
             {"inline_keyboard", {
-                { {{ "text", "📋Отобразить список"},              {"callback_data", c_steam_list_string}} ,
-                  {{ "text", "➕Добавить в список"},              {"callback_data", c_steam_add_string}} },
+                { {{ "text", "📋Отобразить список"},                {"callback_data", c_steam_list_string}} ,
+                  {{ "text", "➕Добавить в список"},                {"callback_data", c_steam_add_string}} },
 
-                { {{ "text", "📈Текущая инфа списка"},            {"callback_data", c_steam_info_string}},
-                  {{ "text", "➖Удалить из списка"},              {"callback_data", c_steam_delete_string}}},
+                { {{ "text", "📈Текущая инфа списка"},              {"callback_data", c_steam_info_string}},
+                  {{ "text", "➖Удалить из списка"},                {"callback_data", c_steam_delete_string}}},
+                
+                { {{ "text", "📈Добавить данные по закупке"},       {"callback_data", c_steam_add_buy_info_string}},
+                  {{ "text", "➖Удалить данные по закупке"},        {"callback_data", c_steam_delete_buy_info_string}}},
 
-                { {{ "text", "🔄В главное меню"},                 {"callback_data", c_main_menu_string}} },
+                { {{ "text", "🔄В главное меню"},                   {"callback_data", c_main_menu_string}} },
             }}
             };
 }
@@ -539,6 +599,10 @@ void TgBot::handleCallbackQuery(const json& callback){
 
                             });
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
+                if(m_user_buy_item_info.count(chat_id) > 0){
+                    m_user_buy_item_info.erase(chat_id);
+                    std::cout << chat_id << ": erased buy item info after cancel" << std::endl;
+                }
                 return;
             }
             //Get user links list from Steam list
@@ -630,7 +694,30 @@ void TgBot::handleCallbackQuery(const json& callback){
                 }
                 return;
             }
+
+            //Add menu to add buy info for user Steam list element
+            if(data.get<std::string>() == c_steam_add_buy_info_string){
+                auto links = m_sqlite_db->getUserLinks(chat_id);
+                if(links.size() <= 0){
+                    sendMessage(chat_id, "Список пустой", steamMenu());
+                    m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
+                }
+                else{
+                    std::vector<std::string> buttons;
+                    for(auto& link: links){
+                        std::string title = link["title"];
+                        buttons.emplace_back(title);
+                    }
+                    auto keyboard = createInlineKeyboard(buttons, "", 2);
+                    keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_menu_string}} });
+                    sendMessage(chat_id, "Выбери ссылку для добавления информации", keyboard);
+                    // sendMessage(chat_id, "*Steam Menu*", steamMenu());
+                    m_context.switchState(chat_id, BotContext::BotState::STEAM_ADD_LINK_BUY_INFO_TITLE);
+                }
+                return;
+            }
         }
+        
         if(user_bot_state == BotContext::BotContext::STEAM_DELETE_LINK){
             if(callback.contains("data")){
                 std::string data = callback["data"];
@@ -648,6 +735,27 @@ void TgBot::handleCallbackQuery(const json& callback){
             }
             return;
         }
+        else if(user_bot_state == BotContext::BotContext::STEAM_ADD_LINK_BUY_INFO_TITLE){
+            if(callback.contains("data")){
+                std::string data = callback["data"];
+                auto& callback_id = callback["id"];
+                auto res = callMethod("answerCallbackQuery", RequestType::ePOST, {
+                                    {"callback_query_id", callback_id}
+                                });
+                
+                m_user_buy_item_info[chat_id].chat_id = chat_id;
+                m_user_buy_item_info[chat_id].title = data;
+
+                std::cout << data << std::endl;
+                json keyboard;
+                keyboard["inline_keyboard"] = json::array();
+                keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_menu_string}} });
+                sendMessage(chat_id, "Введи цену покупки в $",  keyboard);
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_ADD_LINK_BUY_INFO_BUY_PRICE);
+            }
+            return;
+        }
+        
     }
     catch(const std::exception& e){
         std::cerr << "handleCallbackQuery: " << e.what() << std::endl;

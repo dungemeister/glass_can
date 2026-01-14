@@ -17,6 +17,11 @@ public:
         STEAM_DELETE_ALL_LINKS,
         STEAM_LIST_LINKS,
         STEAM_INFO_LINKS,
+        STEAM_ADD_LINK_BUY_INFO_TITLE,
+        STEAM_ADD_LINK_BUY_INFO_BUY_PRICE,
+        STEAM_ADD_LINK_BUY_INFO_AMOUNT,
+        STEAM_ADD_LINK_BUY_INFO_DATE,
+        STEAM_DELETE_LINK_BUY_INFO,
     };
     using UserContext = std::tuple<BotState, std::string>;
     
