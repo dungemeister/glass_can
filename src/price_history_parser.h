@@ -38,12 +38,15 @@ namespace PriceHistory{
 
     static std::string getCookieFromFile(const std::string& filepath){
         std::string web_cookie;
+        std::string line;
         std::fstream cookie_file(filepath);
         if(!cookie_file.is_open()){
             std::cerr <<"Fail to open " << filepath << std::endl;
             return {};
         }
-        while(std::getline(cookie_file, web_cookie)){}
+        while(std::getline(cookie_file, line)){
+            web_cookie += line;
+        }
         
         return web_cookie;
     }
@@ -98,9 +101,7 @@ namespace PriceHistory{
         std::string url = "https://steamcommunity.com/market/pricehistory/?"
             "appid=730&market_hash_name=" + market_hash_name + "&currency=1";
         
-        getCookieFromFile("web.cookie");
-        std::string cookies = "steamLoginSecure=76561198064492302||eyAidHlwIjogIkpXVCIsICJhbGciOiAiRWREU0EiIH0.eyAiaXNzIjogInI6MDAxN18yNzg3M0Q2OF9GQ0UxNiIsICJzdWIiOiAiNzY1NjExOTgwNjQ0OTIzMDIiLCAiYXVkIjogWyAid2ViOmNvbW11bml0eSIgXSwgImV4cCI6IDE3Njg0MDM2NzQsICJuYmYiOiAxNzU5Njc3MjA3LCAiaWF0IjogMTc2ODMxNzIwNywgImp0aSI6ICIwMDE5XzI3ODczRDc5XzRCRTE3IiwgIm9hdCI6IDE3NjgyMTgyMTUsICJydF9leHAiOiAxNzg2NDU2NjkzLCAicGVyIjogMCwgImlwX3N1YmplY3QiOiAiOTIuNTQuMjA0LjExNiIsICJpcF9jb25maXJtZXIiOiAiOTIuNTQuMjA0LjExNiIgfQ.qTmZqm9fmrvj3fgHGHmXLA347uuRMSnJErdeXUlSwPgfxDVg1Wp8ZDBOWy3OfqbyjijfamYMLOhHI8DxSimgAQ;"
-                            "sessionid=d343d1419729e399cf66c063";
+        std::string cookies = getCookieFromFile("web.cookie");
 
         curlpp::Easy req;
         req.setOpt(new curlpp::options::Url(url));

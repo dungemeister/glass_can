@@ -27,6 +27,30 @@ namespace GnuplotChart{
         return true;
     }
 
+    static std::string getLastValueFromDataFile(std::fstream& data_file){
+
+        data_file.seekg(-1, std::ios_base::end);
+        bool keep_looping = true;
+        std::string last_value;            
+        while(keep_looping){
+            char ch;
+            data_file.get(ch);
+
+            if(data_file.tellg() <= 1){
+                data_file.seekg(0);
+                keep_looping = false;
+            }
+            else if(ch == ' ') {               
+                keep_looping = false;
+            }
+            else {                              
+                data_file.seekg(-2, std::ios_base::cur);    
+            }
+        }
+        std::getline(data_file, last_value);
+        return last_value;
+    }
+
     static bool saveGnuplotScriptFile(const std::string& gnuplot_script_filename,
                                       const std::string& points_data_file,
                                       const std::string& output_filename,
@@ -37,6 +61,16 @@ namespace GnuplotChart{
             std::cerr << "ERROR: fail to open " << gnuplot_script_filename << std::endl;
             return false;
         }
+
+        std::fstream data_file(points_data_file);
+        if(!data_file.is_open()){
+            std::cerr << "ERROR: fail to open " << points_data_file << std::endl;
+            return false;
+        }
+
+        auto last_value = getLastValueFromDataFile(data_file);
+        data_file.close();
+        
         size_t xtics = 3 * 30 * 86400;
         std::string timefmt;
 
@@ -63,7 +97,9 @@ namespace GnuplotChart{
                 "set timefmt \"" << timefmt << "\"\n" <<
                 "set format x \"%b %d\"\n" <<
                 "set xtics " << xtics << " nomirror\n" <<
-                "plot '" << points_data_file << "' using 1:5 with lines title \"\""  << std::endl;
+                "set ytics add (\"" << last_value << "\" " << last_value << ")\n" <<
+                "plot '" << points_data_file << "' using 1:5 with lines lc \"green\" linewidth 2 title \"\""  <<
+                 ", " << last_value << " with lines lc \"red\" linewidth 3 title \"Текущая цена\"" <<std::endl;
         gnuplot_file.close();
         return true;
         
