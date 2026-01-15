@@ -97,9 +97,9 @@ namespace PriceHistory{
         return out;
     }
 
-    static std::string pricehistory(const std::string& market_hash_name) {
+    static std::string pricehistory(const std::string& market_hash_name, uint64_t currency=1) {
         std::string url = "https://steamcommunity.com/market/pricehistory/?"
-            "appid=730&market_hash_name=" + market_hash_name + "&currency=1";
+            "appid=730&market_hash_name=" + market_hash_name + "&currency=" + std::to_string(currency);
         
         std::string cookies = getCookieFromFile("web.cookie");
 
@@ -149,8 +149,8 @@ namespace PriceHistory{
         printf("✅ %s сохранён (откройте в Excel/Google Sheets)\n", filename.c_str());
     }
 
-    static std::vector<PricePoint> getPriceHistory(const std::string& market_hash_name, eTimePeriod period = eTimePeriod::ALL_TIME){
-        return parsePriceHistoryJson(pricehistory(market_hash_name), period);
+    static std::vector<PricePoint> getPriceHistory(const std::string& market_hash_name, eTimePeriod period = eTimePeriod::ALL_TIME, uint64_t currency=1){
+        return parsePriceHistoryJson(pricehistory(market_hash_name, currency), period);
     }
 
 
