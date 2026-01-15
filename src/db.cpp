@@ -192,3 +192,22 @@ bool DataBase::addUserItemBuyInfo(uint64_t chat_id, const UserContext::ItemBuyIn
         return false;
     }
 }
+
+nlohmann::json DataBase::getUserItemsBuyInfo(uint64_t chat_id){
+    nlohmann::json result;
+    try{
+        auto user_id = getUserId(chat_id);
+        std::stringstream q;
+        q << "SELECT * FROM items_buy_info WHERE user_id = " << user_id << ";";
+        result["data"] = query(q.str());
+        result["error_msg"] = "";
+        result["ok"] = true;
+
+    }
+    catch(const std::exception& e){
+        result["data"] = nlohmann::json::array();
+        result["error_msg"] = e.what();
+        result["ok"] = false;
+    }
+    return result;
+}

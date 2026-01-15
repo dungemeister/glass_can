@@ -90,6 +90,7 @@ private:
     std::string convertUserLinkMinimal(const json& link);
 
     std::string getUserItemChart(const json& link);
+    std::string getUserItemPriceAnalysys(const json& link, const json& price);
 private:
     std::string m_token;
     std::string m_name;
@@ -111,6 +112,7 @@ private:
 
     const std::string c_steam_add_buy_info_string       = "steam_add_buy_info";
     const std::string c_steam_delete_buy_info_string    = "steam_delete_buy_info";
+    const std::string c_steam_items_buy_info_string     = "steam_items_buy_info";
     
     const std::string c_steam_app_id        = "730"; //CS2 app id
 

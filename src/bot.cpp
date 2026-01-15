@@ -4,6 +4,8 @@
 
 #include <thread>
 #include <fstream>
+#include <iomanip>
+
 void TgBot::initRequestsTable(){
     m_requests_table = {
         {TgAPIRequest::eGET_UPDATES,           {"getUpdates",            RequestType::eGET}},
@@ -545,8 +547,9 @@ json TgBot::steamMenu(){
                 { {{ "text", "📈Текущая инфа списка"},              {"callback_data", c_steam_info_string}},
                   {{ "text", "➖Удалить из списка"},                {"callback_data", c_steam_delete_string}}},
                 
-                { {{ "text", "📈Добавить данные по закупке"},       {"callback_data", c_steam_add_buy_info_string}}},
+                { {{ "text", "➕Добавить данные по закупке"},       {"callback_data", c_steam_add_buy_info_string}}},
                 { {{ "text", "➖Удалить данные по закупке"},        {"callback_data", c_steam_delete_buy_info_string}}},
+                { {{ "text", "📋Данные по закупке"},                {"callback_data", c_steam_items_buy_info_string}}},
 
                 { {{ "text", "🔄В главное меню"},                   {"callback_data", c_main_menu_string}} },
             }}
@@ -716,6 +719,36 @@ void TgBot::handleCallbackQuery(const json& callback){
                 }
                 return;
             }
+            if(data.get<std::string>() == c_steam_items_buy_info_string){
+                std::cout << c_steam_items_buy_info_string << ":" << std::endl;
+                auto db_res = m_sqlite_db->getUserItemsBuyInfo(chat_id);
+                auto& links = db_res["data"];
+                
+                if(db_res["ok"].get<bool>()){
+                    if(links.size() < 0){
+                        sendMessage(chat_id, "Список о запупках пуст", steamMenu());
+                        m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
+                        return;
+                    }
+                    for(auto& link: links){
+                        std::cout << "\t" << link["url"] << ": " << link["title"] << std::endl;
+                        auto price_res = getUserLinkPriceOverview(link);
+                        auto temp = price_res.dump();
+                        if(price_res["json"]["lowest_price"].is_null()){
+
+                            sendMessage(chat_id, "Ошибка запроса: " + link["url"].get<std::string>(), {}, ParseMode::eMARKDOWN_V2, true);                            continue;
+                        }
+                        auto out = getUserItemPriceAnalysys(link, price_res["json"]);
+                        sendMessage(chat_id, out, {}, ParseMode::eMARKDOWN_V2, true, "");
+                    }
+                }
+                else{
+                    sendMessage(chat_id, "Ошибка: " + res["error_msg"].get<std::string>(), steamMenu());
+                }
+                sendMessage(chat_id, "*Steam Menu*", steamMenu(), ParseMode::eMARKDOWN_V2);
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
+                return;
+            }
         }
         
         if(user_bot_state == BotContext::BotContext::STEAM_DELETE_LINK){
@@ -794,6 +827,7 @@ json TgBot::getUserLinkPriceOverview(const json& link){
                 "Медианная цена: *" << data["median_price"] << currency << "*\n" <<
                 "Объем лотов: *" << data["volume"] << "*" << std::endl;
         result["ok"] = true;
+        result["json"] = data;
     }
     else{
         out << "*" << item_hash_name << "*." << "Ошибка выполнения запроса: " << data["error"] << std::endl;
@@ -802,6 +836,7 @@ json TgBot::getUserLinkPriceOverview(const json& link){
     result["caption"] = StringMisc::uriToString(item_hash_name);
     result["url"] = url;
     result["data"] = out.str();
+    result["json"] = data;
 
     return result;
 }
@@ -866,4 +901,39 @@ std::string TgBot::getUserItemChart(const json& link){
         std::cerr << "ERROR: getUserItemChart: " << e.what() << std::endl;
         return {};
     }
+}
+
+std::string TgBot::getUserItemPriceAnalysys(const json& link, const json& price){
+    std::stringstream ss;
+    auto temp1 = price.dump();
+    auto temp2 = link.dump();
+    float cur_price = 0, buy_price = 0, profit_price = 0;
+    uint64_t amount = 0;
+    switch(c_steam_currency){
+        case PriceOverview::SteamCurrency::eUSD:
+        {
+            auto cur_price_ = price["lowest_price"].get<std::string>();
+            if(auto index = cur_price_.find("$"); index != std::string::npos)
+                cur_price_.erase(index, 1);
+
+            cur_price = std::stof(cur_price_);
+            amount = std::stoi(link["amount"].get<std::string>());
+            buy_price = std::stof(link["buy_price"].get<std::string>());
+            profit_price = buy_price * 1.15; //Steam comission is 15%
+
+        }
+        break;
+    }
+    auto markdown_link = StringMisc::createMarkdownLink(link["url"], link["title"]);
+
+    ss << std::fixed << std::setprecision(2) << 
+          "Цена покупки: *" << buy_price << "*\n" <<
+          "Количество: *" << amount << "*\n" <<
+          "Текущая цена: *" << cur_price << "*\n" <<
+          "Цена для окупаемости (цена - комиссия): *"  << profit_price << "*\n" <<
+          "-----------------------------------------\n" << 
+          "Текущий профит ($ с учётом комиссии): *" << (cur_price - profit_price) * amount << "$*\n" <<
+          "Текущий профит (% с учетом комиссии): *" << static_cast<float>((100 * (cur_price - profit_price)) / buy_price) << "%*";
+    auto prepared_out = StringMisc::escapeString(ss.str(), "().,-");
+    return markdown_link + "\n" + prepared_out;
 }
