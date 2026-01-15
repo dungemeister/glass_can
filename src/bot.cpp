@@ -565,22 +565,22 @@ json TgBot::steamWatchListMenu(){
 json TgBot::steamPurchaseListMenu(){
     return{
             {"inline_keyboard", {
-                { {{ "text", "📋Отобразить список"},                {"callback_data", c_steam_list_purchased_items_string}} },
+                { {{ "text", "📋Отобразить список"},                {"callback_data", c_steam_purchased_item_info_string}} },
                 
                 { {{ "text", "➕Добавить данные по закупке"},       {"callback_data", c_steam_add_purchased_item_string}},
                  {{ "text", "➖Удалить данные по закупке"},         {"callback_data", c_steam_delete_purchased_item_string}}},
 
-                { {{ "text", "📈Данные по закупке"},                {"callback_data", c_steam_purchased_item_info_string}}},
+                { {{ "text", "📈Данные по закупке"},                {"callback_data", c_steam_list_purchased_items_string}}},
                 { {{"text", "🔄В главное меню"},                    {"callback_data", c_main_menu_string}} }
             }}
         };
 }
 
-json TgBot::steamAddLinkMenu(){
+json TgBot::steamWatchListAddLinkMenu(){
     return{
             {"inline_keyboard", {
-                { {{"text", "❌Отмена"},         {"callback_data", c_steam_menu_string}} },
-                { {{"text", "🔄В главное меню"}, {"callback_data", c_main_menu_string}} }
+                { {{"text", "❌Отмена"},         {"callback_data", c_steam_list_watch_list_string}} },
+                { {{"text", "🔄В главное меню"}, {"callback_data", c_steam_watch_list_menu_string}} }
             }}
         };
 }
@@ -614,7 +614,7 @@ void TgBot::handleCallbackQuery(const json& callback){
                 return;
             }
             //Send Steam purchase list menu
-            if(data.get<std::string>() == c_steam_purchase_list_menu_string){
+            else if(data.get<std::string>() == c_steam_purchase_list_menu_string){
                 callMethod("editMessageText", RequestType::ePOST, {
                             {"chat_id", chat_id},
                             {"message_id", message_id},
@@ -627,7 +627,7 @@ void TgBot::handleCallbackQuery(const json& callback){
                 return;
             }
             //Send Steam watch list menu
-            if(data.get<std::string>() == c_steam_watch_list_menu_string){
+            else if(data.get<std::string>() == c_steam_watch_list_menu_string){
                 callMethod("editMessageText", RequestType::ePOST, {
                             {"chat_id", chat_id},
                             {"message_id", message_id},
@@ -641,7 +641,7 @@ void TgBot::handleCallbackQuery(const json& callback){
             }
 
             //Send steam menu to user
-            if(data.get<std::string>() == c_steam_menu_string){
+            else if(data.get<std::string>() == c_steam_menu_string){
                 callMethod("editMessageText", RequestType::ePOST, {
                             {"chat_id", chat_id},
                             {"message_id", message_id},
@@ -660,7 +660,7 @@ void TgBot::handleCallbackQuery(const json& callback){
 
             // Steam watch list
             //Get user links list from Steam watch list
-            if(data.get<std::string>() == c_steam_list_watch_list_string){
+            else if(data.get<std::string>() == c_steam_list_watch_list_string){
                 auto links = m_sqlite_db->getUserLinks(chat_id);
                 auto username = std::get<1>(user_context);
                 std::cout << "Requested watch list from " << username << std::endl;
@@ -676,13 +676,13 @@ void TgBot::handleCallbackQuery(const json& callback){
                 return;
             }
             //Send message to add link to Steam watch list
-            if(data.get<std::string>() == c_steam_add_watch_list_string){
+            else if(data.get<std::string>() == c_steam_add_watch_list_string){
                 callMethod("editMessageText", RequestType::ePOST, {
                             {"chat_id", chat_id},
                             {"message_id", message_id},
                             {"text", "*Steam Add Link Menu*\n Отправь ссылку для отслеживания в формате 'https://example\\.com \\# CS2 Spectrum case'"},
                             {"parse_mode", "MarkdownV2"},
-                            {"reply_markup", steamAddLinkMenu()}
+                            {"reply_markup", steamWatchListAddLinkMenu()}
 
                             });
                 
@@ -690,7 +690,7 @@ void TgBot::handleCallbackQuery(const json& callback){
                 return;
             }
             //Send current items info from Steam watch list
-            if(data.get<std::string>() == c_steam_info_watch_list_string){
+            else if(data.get<std::string>() == c_steam_info_watch_list_string){
                 auto links = m_sqlite_db->getUserLinks(chat_id);
                 if(links.size() > 0){
                     for(const auto& link: links){
@@ -705,8 +705,13 @@ void TgBot::handleCallbackQuery(const json& callback){
                                        markdown_link << "\n" <<
                                        StringMisc::escapeString(result["data"]) << std::endl;
                             std::cout << caption.str();
-                            auto response = sendPhotoFile(chat_id, png_path, caption.str());
+                            if(png_path.empty()){
+                                std::cerr << "Fail to get ong_file path" << std::endl;
+                                sendMessage(chat_id, caption.str(), {});
+                                continue;
+                            }
 
+                            auto response = sendPhotoFile(chat_id, png_path, caption.str());
                             auto json = nlohmann::json::parse(response);
                             if (json["ok"].get<bool>()) {
                                 std::cout << "Photo sent with file_id: " << json["result"]["photo"][0]["file_id"] << std::endl;
@@ -717,22 +722,22 @@ void TgBot::handleCallbackQuery(const json& callback){
                             std::cerr << " JSON парсинг ошибка" << std::endl;
                         }
                     }
-                    sendMessage(chat_id, "*Steam Menu*", steamWatchListMenu());
+                    sendMessage(chat_id, "*Список наблюдения*", steamWatchListMenu());
                 }
                 else{
 
-                    sendMessage(chat_id, "Список пуст\n*Steam Menu*", steamWatchListMenu());
+                    sendMessage(chat_id, "*Список наблюдения пуст*", steamWatchListMenu());
                 }
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_WATCH_LIST_MENU);
                 return;
             }
 
             //Send menu to delete from Steam watch list
-            if(data.get<std::string>() == c_steam_delete_watch_list_string){
+            else if(data.get<std::string>() == c_steam_delete_watch_list_string){
                 auto links = m_sqlite_db->getUserLinks(chat_id);
                 if(links.size() <= 0){
                     sendMessage(chat_id, "Список пустой", steamWatchListMenu());
-                    m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
+                    m_context.switchState(chat_id, BotContext::BotState::STEAM_WATCH_LIST_MENU);
                 }
                 else{
                     std::vector<std::string> buttons;
@@ -751,11 +756,11 @@ void TgBot::handleCallbackQuery(const json& callback){
             
             //Steam purchased list
             //Send menu to add item to user's Steam purchased list
-            if(data.get<std::string>() == c_steam_add_purchased_item_string){
+            else if(data.get<std::string>() == c_steam_add_purchased_item_string){
                 auto links = m_sqlite_db->getUserLinks(chat_id);
                 if(links.size() <= 0){
-                    sendMessage(chat_id, "Список пустой", steamMenu());
-                    m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
+                    sendMessage(chat_id, "Список пустой", steamPurchaseListMenu());
+                    m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
                 }
                 else{
                     std::vector<std::string> buttons;
@@ -764,7 +769,7 @@ void TgBot::handleCallbackQuery(const json& callback){
                         buttons.emplace_back(title);
                     }
                     auto keyboard = createInlineKeyboard(buttons, "", 2);
-                    keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_menu_string}} });
+                    keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_purchase_list_menu_string}} });
                     sendMessage(chat_id, "Выбери ссылку для добавления информации", keyboard);
                     // sendMessage(chat_id, "*Steam Menu*", steamMenu());
                     m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_ADD_LINK_TITLE);
@@ -772,7 +777,7 @@ void TgBot::handleCallbackQuery(const json& callback){
                 return;
             }
             //Send list of items from user's purchased list
-            if(data.get<std::string>() == c_steam_list_purchased_items_string){
+            else if(data.get<std::string>() == c_steam_list_purchased_items_string){
                 std::cout << c_steam_list_purchased_items_string << ":" << std::endl;
                 auto db_res = m_sqlite_db->getUserItemsBuyInfo(chat_id);
                 auto& links = db_res["data"];
@@ -794,17 +799,17 @@ void TgBot::handleCallbackQuery(const json& callback){
                         auto out = getUserItemPriceAnalysys(link, price_res["json"]);
                         sendMessage(chat_id, out, {}, ParseMode::eMARKDOWN_V2, true, "");
                     }
+                    sendMessage(chat_id, "*Список покупок*", steamPurchaseListMenu(), ParseMode::eMARKDOWN_V2);
                 }
                 else{
                     sendMessage(chat_id, "Ошибка: " + res["error_msg"].get<std::string>(), steamPurchaseListMenu());
                 }
-                sendMessage(chat_id, "", steamPurchaseListMenu(), ParseMode::eMARKDOWN_V2);
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
                 return;
             }
         }
         //Send menu to delete user's item from purchased list
-        if(user_bot_state == BotContext::BotContext::STEAM_PURCHASE_LIST_DELETE_LINK){
+        if(user_bot_state == BotContext::BotContext::STEAM_WATCH_LIST_DELETE_LINK){
             if(callback.contains("data")){
                 std::string data = callback["data"];
                 auto& callback_id = callback["id"];
@@ -812,12 +817,12 @@ void TgBot::handleCallbackQuery(const json& callback){
                                     {"callback_query_id", callback_id}
                                 });
                 if(auto res = m_sqlite_db->deleteUserLink(chat_id, data); !res){
-                    sendMessage(chat_id, "Ошибка удаления " + data, steamMenu());
+                    sendMessage(chat_id, "Ошибка удаления " + data, steamWatchListMenu());
                 }
                 else{
-                    sendMessage(chat_id, "Элемент '" + data + "' удален", steamMenu());
+                    sendMessage(chat_id, "Элемент '" + data + "' удален", steamWatchListMenu());
                 }
-                m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_WATCH_LIST_MENU);
             }
             return;
         }
@@ -835,7 +840,7 @@ void TgBot::handleCallbackQuery(const json& callback){
                 std::cout << data << std::endl;
                 json keyboard;
                 keyboard["inline_keyboard"] = json::array();
-                keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_menu_string}} });
+                keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_purchase_list_menu_string}} });
                 sendMessage(chat_id, "Введи цену покупки в $",  keyboard);
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_ADD_LINK_BUY_PRICE);
             }
@@ -939,7 +944,7 @@ std::string TgBot::getUserItemChart(const json& link){
         auto filesystem_res = FilesystemManager::rm_rf(assets_dir.str() + "/*");
         filesystem_res = FilesystemManager::mkdir(assets_dir.str());
         
-        auto plots = PriceHistory::getPriceHistory(market_hash_name, time_period);
+        auto plots = PriceHistory::getPriceHistory(market_hash_name, time_period, static_cast<uint64_t>(c_steam_currency));
         std::cout << "For " << item_name << " found points: " << plots.size() << std::endl;
 
         std::string points_data_file = assets_dir.str() + "/" + market_hash_name + "_data";
