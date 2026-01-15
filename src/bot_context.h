@@ -9,19 +9,24 @@ public:
     
     enum BotState{
         INVALID,
+        //Menus
         MAIN_MENU,
         STEAM_MENU,
+        STEAM_PURCHASE_LIST_MENU,
+        STEAM_WATCH_LIST_MENU,
         OTHER_MENU,
-        STEAM_ADD_LINK,
-        STEAM_DELETE_LINK,
-        STEAM_DELETE_ALL_LINKS,
-        STEAM_LIST_LINKS,
-        STEAM_INFO_LINKS,
-        STEAM_ADD_LINK_BUY_INFO_TITLE,
-        STEAM_ADD_LINK_BUY_INFO_BUY_PRICE,
-        STEAM_ADD_LINK_BUY_INFO_AMOUNT,
-        STEAM_ADD_LINK_BUY_INFO_DATE,
-        STEAM_DELETE_LINK_BUY_INFO,
+        //Watch list
+        STEAM_WATCH_LIST_ADD_LINK,
+        STEAM_WATCH_LIST_DELETE_LINK,
+        STEAM_WATCH_LIST_DELETE_ALL_LINKS,
+        STEAM_LIST_WATCH_LIST_LINKS,
+        STEAM_INFO_WATCH_LIST_LINKS,
+        //Purchase list
+        STEAM_PURCHASE_LIST_ADD_LINK_TITLE,
+        STEAM_PURCHASE_LIST_ADD_LINK_BUY_PRICE,
+        STEAM_PURCHASE_LIST_ADD_LINK_AMOUNT,
+        STEAM_PURCHASE_LIST_ADD_LINK_DATE,
+        STEAM_PURCHASE_LIST_DELETE_LINK,
     };
     using UserContext = std::tuple<BotState, std::string>;
     

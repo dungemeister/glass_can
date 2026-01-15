@@ -75,6 +75,8 @@ private:
     //InlineKeyboard
     json mainMenu();
     json steamMenu();
+    json steamWatchListMenu();
+    json steamPurchaseListMenu();
     json steamAddLinkMenu();
     
     nlohmann::json createInlineKeyboard(const std::vector<std::string>& buttons, const std::string& callback_prefix, int rows);
@@ -103,16 +105,20 @@ private:
     std::unordered_map<TgAPIRequest, std::tuple<std::string, RequestType>> m_requests_table;
     std::unordered_map<uint64_t, UserContext::ItemBuyInfo> m_user_buy_item_info;
 
-    const std::string c_main_menu_string                = "main_menu";
-    const std::string c_steam_menu_string               = "steam_menu";
-    const std::string c_steam_add_string                = "steam_add";
-    const std::string c_steam_delete_string             = "steam_delete";
-    const std::string c_steam_list_string               = "steam_list";
-    const std::string c_steam_info_string               = "steam_info";
+    const std::string c_main_menu_string                  = "main_menu";
+    const std::string c_steam_menu_string                 = "steam_menu";
+    const std::string c_steam_purchase_list_menu_string   = "steam_purchased_list_menu";
+    const std::string c_steam_watch_list_menu_string      = "steam_watch_list_menu";
 
-    const std::string c_steam_add_buy_info_string       = "steam_add_buy_info";
-    const std::string c_steam_delete_buy_info_string    = "steam_delete_buy_info";
-    const std::string c_steam_items_buy_info_string     = "steam_items_buy_info";
+    const std::string c_steam_add_watch_list_string                = "steam_add";
+    const std::string c_steam_delete_watch_list_string             = "steam_delete";
+    const std::string c_steam_list_watch_list_string               = "steam_list";
+    const std::string c_steam_info_watch_list_string               = "steam_info";
+
+    const std::string c_steam_add_purchased_item_string            = "steam_add_buy_info";
+    const std::string c_steam_delete_purchased_item_string         = "steam_delete_buy_info";
+    const std::string c_steam_purchased_item_info_string           = "steam_items_buy_info";
+    const std::string c_steam_list_purchased_items_string          = "steam_list_items_purchased";
     
     const std::string c_steam_app_id        = "730"; //CS2 app id
 

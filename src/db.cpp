@@ -193,6 +193,27 @@ bool DataBase::addUserItemBuyInfo(uint64_t chat_id, const UserContext::ItemBuyIn
     }
 }
 
+nlohmann::json DataBase::deleteUserItemBuyInfo(uint64_t chat_id, const std::string& title){
+    nlohmann::json result;
+    try{
+        auto user_id = getUserId(chat_id);
+        std::stringstream q;
+        q << "DELETE FROM items_buy_info WHERE title = '" << title << "'" <<
+             "AND user_id = " << user_id << ";";
+             
+        exec(q.str());
+        result["data"] = nlohmann::json::array();
+        result["error_msg"] = "";
+        result["ok"] = true;
+    }
+    catch(const std::exception& e){
+        result["data"] = nlohmann::json::array();
+        result["error_msg"] = std::string(e.what());
+        result["ok"] = false;
+    }
+    return result;
+}
+
 nlohmann::json DataBase::getUserItemsBuyInfo(uint64_t chat_id){
     nlohmann::json result;
     try{
@@ -206,7 +227,7 @@ nlohmann::json DataBase::getUserItemsBuyInfo(uint64_t chat_id){
     }
     catch(const std::exception& e){
         result["data"] = nlohmann::json::array();
-        result["error_msg"] = e.what();
+        result["error_msg"] = std::string(e.what());
         result["ok"] = false;
     }
     return result;
