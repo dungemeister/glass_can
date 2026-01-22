@@ -2,9 +2,9 @@
 
 #include <functional>
 #include <mutex>
+#include <thread>
 #include <queue>
 #include <condition_variable>
-#include "worker.h"
 
 class WorkerPool{
 public:

@@ -100,7 +100,6 @@ private:
     std::string m_name;
     uint64_t    m_id;
     bool        m_authorized;
-    const uint64_t m_wife_chat_id = 1305113463;
     std::unique_ptr<DataBase> m_sqlite_db;
     BotContext m_context;
     WorkerPool m_workers_pool;
