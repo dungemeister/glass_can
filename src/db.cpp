@@ -40,7 +40,7 @@ void DataBase::initSchema(){
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
 
-            CREATE TABLE items_buy_info (
+            CREATE TABLE IF NOT EXISTS items_buy_info (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
                 url TEXT NOT NULL,
