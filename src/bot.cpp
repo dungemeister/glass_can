@@ -114,6 +114,51 @@ json TgBot::getUpdates(uint64_t offset){
     }
 }
 
+void TgBot::handleUpdate(const json& update){
+    if(update.contains("message")){
+        auto message = update["message"];
+        std::string username = message["chat"]["username"];
+        std::string first_name = message["chat"]["first_name"];
+        auto chat_id = message["chat"]["id"].get<uint64_t>();
+
+        auto user_state = m_context.getUserContext(chat_id);
+        if(std::get<0>(user_state) == BotContext::BotState::INVALID){
+            m_context.setUserContext(chat_id, std::make_tuple(BotContext::BotState::MAIN_MENU, username));
+        }
+        auto user_id = m_sqlite_db->addUser(chat_id, username, first_name);
+        //Handling text messages
+        if(message.contains("text")){
+            auto text = message["text"].get<std::string>();
+            handleText(chat_id, text);
+            
+        }
+        //Handling voice messages
+        if(message.contains("voice")){
+            auto voice = message["voice"];
+
+            auto file_id   = voice["file_id"].get<std::string>();
+            auto file_size = voice["file_size"].get<uint64_t>();
+            auto duration  = voice["duration"].get<uint64_t>();
+
+            std::cout << "file id: " << file_id << std::endl;
+            std::cout << "file size: " << file_size << std::endl;
+            std::cout << "duration: " << duration << std::endl;
+            if(file_size <= 20 * 1024 * 1024){
+                auto result = getFile(file_id);
+                if(!result.empty() && !result.is_null()){
+                    auto file_path = result["file_path"];
+                    auto file_size = result["file_size"];
+
+                    auto res = downloadTelegramFile(file_path, username + "_voice.ogg");
+                }
+            }
+        }
+    }
+    if(update.contains("callback_query")){
+        handleCallbackQuery(update["callback_query"]);
+    }
+}
+
 bool TgBot::sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard={}, ParseMode mode=ParseMode::eMARKDOWN_V2, bool disable_web_preview=false,
                        const std::string& espace_symbols="_~>#+-=|{}.!"){
     
@@ -257,6 +302,7 @@ void TgBot::handleText(uint64_t chat_id, const std::string& text){
 
 void TgBot::loop(){
     std::cout << "Running SQLite Database..." << std::endl;
+
     initDatabase();
     std::cout << "Authorizing Bot..." << std::endl;
     getMe();
@@ -275,49 +321,10 @@ void TgBot::loop(){
         for(const auto& update: updates){
             offset = update["update_id"].get<uint64_t>() + 1;
             // std::cout << update.dump() << "\n" << std::endl;
+            m_workers_pool.enqueue([this, update]{
+                handleUpdate(update);
+            });
 
-            if(update.contains("message")){
-                auto message = update["message"];
-                std::string username = message["chat"]["username"];
-                std::string first_name = message["chat"]["first_name"];
-                auto chat_id = message["chat"]["id"].get<uint64_t>();
-
-                auto user_state = m_context.getUserContext(chat_id);
-                if(std::get<0>(user_state) == BotContext::BotState::INVALID){
-                    m_context.setUserContext(chat_id, std::make_tuple(BotContext::BotState::MAIN_MENU, username));
-                }
-                auto user_id = m_sqlite_db->addUser(chat_id, username, first_name);
-                //Handling text messages
-                if(message.contains("text")){
-                    auto text = message["text"].get<std::string>();
-                    handleText(chat_id, text);
-                    
-                }
-                //Handling voice messages
-                if(message.contains("voice")){
-                    auto voice = message["voice"];
-
-                    auto file_id   = voice["file_id"].get<std::string>();
-                    auto file_size = voice["file_size"].get<uint64_t>();
-                    auto duration  = voice["duration"].get<uint64_t>();
-
-                    std::cout << "file id: " << file_id << std::endl;
-                    std::cout << "file size: " << file_size << std::endl;
-                    std::cout << "duration: " << duration << std::endl;
-                    if(file_size <= 20 * 1024 * 1024){
-                        auto result = getFile(file_id);
-                        if(!result.empty() && !result.is_null()){
-                            auto file_path = result["file_path"];
-                            auto file_size = result["file_size"];
-
-                            auto res = downloadTelegramFile(file_path, username + "_voice.ogg");
-                        }
-                    }
-                }
-            }
-            if(update.contains("callback_query")){
-                handleCallbackQuery(update["callback_query"]);
-            }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
     }

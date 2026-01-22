@@ -2,13 +2,13 @@
 #include "curlpp/cURLpp.hpp"
 #include "curlpp/Easy.hpp"
 #include "curlpp/Options.hpp"
-
 #include "db.h"
 #include "bot_context.h"
 #include "price_overview_parser.h"
 #include "price_history_parser.h"
 #include "gnuplot_chart.h"
 #include "user_context.h"
+#include "worker_pool.h"
 
 #include "nlohmann/json.hpp"
 #include <tuple>
@@ -42,6 +42,7 @@ public:
     explicit TgBot(const std::string& _token)
     :m_token(_token)
     ,m_authorized(false)
+    ,m_workers_pool(std::thread::hardware_concurrency())
     {  initRequestsTable();  }
     
     void loop();
@@ -52,6 +53,7 @@ private:
     json callMethod(const std::string& method, RequestType type, const json& params);
     
     json getUpdates(uint64_t offset);
+    void handleUpdate(const json& update);
     bool sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard, ParseMode mode, bool disable_web_preview, const std::string& espace_symbols);
     void getBotname();
     
@@ -101,9 +103,12 @@ private:
     const uint64_t m_wife_chat_id = 1305113463;
     std::unique_ptr<DataBase> m_sqlite_db;
     BotContext m_context;
+    WorkerPool m_workers_pool;
     
     std::unordered_map<TgAPIRequest, std::tuple<std::string, RequestType>> m_requests_table;
     std::unordered_map<uint64_t, UserContext::ItemBuyInfo> m_user_buy_item_info;
+
+    // const size_t c_workers_threads = ;
 
     const std::string c_main_menu_string                  = "main_menu";
     const std::string c_steam_menu_string                 = "steam_menu";
@@ -123,6 +128,5 @@ private:
     const std::string c_steam_app_id        = "730"; //CS2 app id
 
     const PriceOverview::SteamCurrency c_steam_currency = PriceOverview::SteamCurrency::eUSD; //Current steam currency
-
     
 };
