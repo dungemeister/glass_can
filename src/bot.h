@@ -38,6 +38,10 @@ public:
         eGET,
         ePOST,
     };
+    enum MessageWebPreview{
+        eDISABLE_WEB_PREVIEW,
+        eENABLE_WEB_PREVIEW,
+    };
 
     explicit TgBot(const std::string& _token)
     :m_token(_token)
@@ -54,7 +58,7 @@ private:
     
     json getUpdates(uint64_t offset);
     void handleUpdate(const json& update);
-    bool sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard, ParseMode mode, bool disable_web_preview, const std::string& espace_symbols);
+    bool sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard, ParseMode mode, MessageWebPreview disable_web_preview, const std::string& espace_symbols);
     void getBotname();
     
     void getMe();
