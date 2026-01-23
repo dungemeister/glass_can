@@ -5,7 +5,7 @@ WorkerPool::WorkerPool(size_t workers)
 :m_stop(false)
 {
     for(auto i = 0; i < workers; ++i){
-        m_workers.emplace_back([this](){
+        m_workers.emplace_back([this, i](){
             while(true){
                 std::function<void()> task;
                 {
@@ -18,7 +18,7 @@ WorkerPool::WorkerPool(size_t workers)
                     task = dequeue();
                 }
 
-                std::cout << "Running task from " << std::this_thread::get_id() << std::endl;
+                std::cout << "Running task worker " << i << std::endl;
                 task();
             }
         });
