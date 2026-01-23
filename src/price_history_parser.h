@@ -106,7 +106,6 @@ namespace PriceHistory{
         curlpp::Easy req;
         req.setOpt(new curlpp::options::Url(url));
         
-        // МИНИМУМ 2026:
         req.setOpt(new curlpp::options::Cookie(cookies));
         req.setOpt(new curlpp::options::Referer("https://steamcommunity.com/market/"));
         req.setOpt(new curlpp::options::UserAgent("Mozilla/5.0 (X11; Linux x86_64; rv:141.0) Gecko/20100101 Firefox/141.0"));
@@ -120,7 +119,6 @@ namespace PriceHistory{
     static void savePriceHistoryToCSV(const std::vector<PricePoint>& points, const std::string& filename) {
         std::ofstream csv(filename);
         
-        // Заголовки
         csv << "Date,Price_USD,Volume,Price_Change_24h\n";
         
         if (!points.empty()) {
@@ -129,15 +127,12 @@ namespace PriceHistory{
             for (size_t i = 0; i < points.size(); ++i) {
                 const auto& p = points[i];
                 
-                // Форматируем дату
-                std::string date = p.date.substr(0, 16); // "Jan 12 2026 12:00"
+                std::string date = p.date.substr(0, 16); // "Example: Jan 12 2026 12:00"
                 
-                // Изменение цены
                 double change24h = (i > 0) ? 
                     (p.median - prevPrice) / prevPrice * 100 : 0;
                 prevPrice = p.median;
                 
-                // Запись CSV (с экранированием)
                 csv << "\"" << date << "\"," 
                     << std::fixed << std::setprecision(4) << p.median << ","
                     << p.volume << "," 
@@ -146,7 +141,7 @@ namespace PriceHistory{
         }
         
         csv.close();
-        printf("✅ %s сохранён (откройте в Excel/Google Sheets)\n", filename.c_str());
+        std::cout << "Saved: " << filename.c_str() << std::endl;
     }
 
     static std::vector<PricePoint> getPriceHistory(const std::string& market_hash_name, eTimePeriod period = eTimePeriod::ALL_TIME, uint64_t currency=1){
