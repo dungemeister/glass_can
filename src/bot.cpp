@@ -21,6 +21,13 @@ void TgBot::initRequestsTable(){
     };
 }
 
+void TgBot::initCommandList(){
+    m_commands_map = {
+        {"/start", [this](uint64_t chat_id){ sendMessage(chat_id, "Выбери список", mainMenu(), ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");}},
+        {"/ping" , [this](uint64_t chat_id){ sendMessage(chat_id, "pong"         , {}        , ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");}},
+    };
+}
+
 json TgBot::callRequest(TgAPIRequest request, const json& params={}){
     auto data = m_requests_table.find(request);
     if(data == m_requests_table.end()){
@@ -210,18 +217,21 @@ void TgBot::handleText(uint64_t chat_id, const std::string& text){
     auto user_context = m_context.getUserContext(chat_id);
     auto user_state = std::get<0>(user_context);
     auto username = std::get<1>(user_context);
+    auto first_char = text.at(0);
+
+    if(first_char == '/'){
+        auto it = m_commands_map.find(text);
+        if(it == m_commands_map.end()){
+            sendMessage(chat_id, "Неизвестная команда");
+        }
+        else{
+            auto handler = it->second;
+            handler(chat_id);
+        }
+        return;
+    }
 
     std::cout << "#" << username << ": " << text << std::endl;
-    if(text == "ping"){
-        std::string msg = "*pong*";
-
-        sendMessage(chat_id, msg);
-    }
-    if(text == "/start"){
-        m_context.switchState(chat_id, BotContext::BotState::MAIN_MENU);
-
-        sendMessage(chat_id, "Hello, @" + username, mainMenu());
-    }
     
     switch(user_state){
         case BotContext::BotState::STEAM_WATCH_LIST_ADD_LINK:
@@ -297,6 +307,7 @@ void TgBot::handleText(uint64_t chat_id, const std::string& text){
 
         }
         break;
+        default: break;
     }
 }
 
@@ -311,8 +322,7 @@ void TgBot::loop(){
         return;
     }
     
-    setChatMenuButton(0);
-    auto commands = getMyCommands().dump();
+    auto commands = getMyCommands();
     auto gifts = getAvailableGifts().dump();
 
     uint64_t offset = 0;
@@ -715,7 +725,6 @@ void TgBot::handleCallbackQuery(const json& callback){
                                 sendMessage(chat_id, caption.str(), {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");
                                 continue;
                             }
-
                             auto response = sendPhotoFile(chat_id, png_path, caption.str());
                             auto json = nlohmann::json::parse(response);
                             if (json["ok"].get<bool>()) {
@@ -985,6 +994,7 @@ std::string TgBot::getUserItemPriceAnalysys(const json& link, const json& price)
 
         }
         break;
+        default: break;
     }
     auto markdown_link = StringMisc::createMarkdownLink(link["url"], link["title"]);
 

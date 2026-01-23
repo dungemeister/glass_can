@@ -9,6 +9,7 @@
 #include "gnuplot_chart.h"
 #include "user_context.h"
 #include "worker_pool.h"
+#include "bot_config.h"
 
 #include "nlohmann/json.hpp"
 #include <tuple>
@@ -43,15 +44,24 @@ public:
         eENABLE_WEB_PREVIEW,
     };
 
-    explicit TgBot(const std::string& _token)
-    :m_token(_token)
-    ,m_authorized(false)
-    ,m_workers_pool(std::thread::hardware_concurrency())
-    {  initRequestsTable();  }
+    using BotCommand = std::function<void(uint64_t chat_id)>;
+
+    explicit TgBot(const std::string& config_file)
+    :m_authorized(false)
+    ,m_config(config_file)
+    ,m_workers_pool(m_config.getBotWorkers())
+    {
+        initRequestsTable();
+        initCommandList();
+        
+        m_token = m_config.getBotToken();
+    }
     
     void loop();
 private:
     void initRequestsTable();
+    void initCommandList();
+
     void handleText(uint64_t chat_id, const std::string& text);
     json callRequest(TgAPIRequest request, const json& params);
     json callMethod(const std::string& method, RequestType type, const json& params);
@@ -106,12 +116,12 @@ private:
     bool        m_authorized;
     std::unique_ptr<DataBase> m_sqlite_db;
     BotContext m_context;
+    BotConfig m_config;
     WorkerPool m_workers_pool;
     
-    std::unordered_map<TgAPIRequest, std::tuple<std::string, RequestType>> m_requests_table;
-    std::unordered_map<uint64_t, UserContext::ItemBuyInfo> m_user_buy_item_info;
-
-    // const size_t c_workers_threads = ;
+    std::unordered_map<TgAPIRequest, std::tuple<std::string, RequestType>>  m_requests_table;
+    std::unordered_map<uint64_t, UserContext::ItemBuyInfo>                  m_user_buy_item_info;
+    std::unordered_map<std::string, BotCommand>                             m_commands_map;
 
     const std::string c_main_menu_string                  = "main_menu";
     const std::string c_steam_menu_string                 = "steam_menu";
