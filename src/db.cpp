@@ -106,11 +106,11 @@ std::vector<nlohmann::json> DataBase::query(const std::string& sql){
 
         nlohmann::json row;
         for (int i = 0; i < argc; ++i) {
-            // argv[i] == nullptr означает SQL NULL
+            // argv[i] == nullptr means SQL NULL
             row[col[i]] = argv[i] ? argv[i] : "";
         }
         out->push_back(std::move(row));
-        return 0; // 0 = продолжать
+        return 0; // 0 = continue
     };
     if(auto res = sqlite3_exec(m_db, sql.c_str(), cb, &rows, &err);res != SQLITE_OK){
         std::string error_msg = err ? err: "Unknown Error";

@@ -11,9 +11,9 @@
 
 namespace PriceHistory{
     struct PricePoint {
-        std::string date;   // как пришло от Steam
-        double median = 0;  // цена
-        int volume = 0;     // объем
+        std::string date;
+        double median = 0;
+        int volume = 0;
     };
 
     enum eTimePeriod{

@@ -38,7 +38,6 @@ namespace PriceOverview{
                 request.setOpt(new curlpp::options::UserAgent(
                     "Mozilla/5.0 (X11; Linux x86_64; rv:141.0) Gecko/20100101 Firefox/141.0"));
                 
-                // Правильный способ для curlpp 0.8.1
                 request.setOpt(new curlpp::options::WriteStream(&response));
                 
                 request.setOpt(new curlpp::options::FollowLocation(true));
