@@ -34,6 +34,7 @@ public:
         eGET_FILE,
         eSET_CHAT_MENU_BUTTON,
         eGET_AVAILABLE_GIFTS,
+        eSET_MY_COMMANDS,
     };
     enum RequestType{
         eGET,
@@ -44,7 +45,7 @@ public:
         eENABLE_WEB_PREVIEW,
     };
 
-    using BotCommand = std::function<void(uint64_t chat_id)>;
+    
 
     explicit TgBot(const std::string& config_file)
     :m_authorized(false)
@@ -78,6 +79,7 @@ private:
     bool forwardMessage(uint64_t chat_id, uint64_t from_chat_id, uint64_t message_id);
 
     json getMyCommands();
+    json setMyCommands();
     json getFile(const std::string& file_id);
     
     bool downloadTelegramFile(const std::string& file_path, const std::string& save_as);
@@ -109,6 +111,8 @@ private:
 
     std::string getUserItemChart(const json& link);
     std::string getUserItemPriceAnalysys(const json& link, const json& price);
+
+    void updateBotCommands(const json& commands);
 private:
     std::string m_token;
     std::string m_name;
@@ -121,7 +125,7 @@ private:
     
     std::unordered_map<TgAPIRequest, std::tuple<std::string, RequestType>>  m_requests_table;
     std::unordered_map<uint64_t, UserContext::ItemBuyInfo>                  m_user_buy_item_info;
-    std::unordered_map<std::string, BotCommand>                             m_commands_map;
+    std::unordered_map<std::string, BotContext::BotCommand>                 m_commands_map;
 
     const std::string c_main_menu_string                  = "main_menu";
     const std::string c_steam_menu_string                 = "steam_menu";

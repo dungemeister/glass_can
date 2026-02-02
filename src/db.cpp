@@ -27,6 +27,7 @@ void DataBase::initSchema(){
                 chat_id INTEGER UNIQUE NOT NULL,
                 username TEXT,
                 first_name TEXT,
+                currency TEXT DEFAULT USD,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -221,6 +222,27 @@ nlohmann::json DataBase::getUserItemsBuyInfo(uint64_t chat_id){
         std::stringstream q;
         q << "SELECT * FROM items_buy_info WHERE user_id = " << user_id << ";";
         result["data"] = query(q.str());
+        result["error_msg"] = "";
+        result["ok"] = true;
+
+    }
+    catch(const std::exception& e){
+        result["data"] = nlohmann::json::array();
+        result["error_msg"] = std::string(e.what());
+        result["ok"] = false;
+    }
+    return result;
+}
+
+nlohmann::json DataBase::setUserCurrency(uint64_t chat_id, const std::string& currency){
+    nlohmann::json result;
+    try{
+        std::stringstream q;
+        q << "UPDATE users\n" <<
+             "SET currency = '" << currency <<"'\n" <<
+             "WHERE chat_id = " << chat_id << ";";
+        exec(q.str());
+        result["data"] = nlohmann::json::array();
         result["error_msg"] = "";
         result["ok"] = true;
 

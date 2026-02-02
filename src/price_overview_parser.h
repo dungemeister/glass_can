@@ -4,6 +4,17 @@
 #include "curlpp/Options.hpp"
 #include <string>
 #include <sstream>
+#include <optional>
+
+#define ENUM_VALID_CAST(EnumType, value) \
+([value]() -> std::optional<EnumType> { \
+    switch (value) { \
+        case EnumType::eUSD: case EnumType::eEUR: \
+        case EnumType::eRUB:\
+            return static_cast<EnumType>(value); \
+        default: return std::nullopt; \
+    } \
+}())
 
 namespace PriceOverview{
 
@@ -19,6 +30,16 @@ namespace PriceOverview{
         eEUR = 3,
         eRUB = 5,
     };
+    
+    static std::string getSteamCurrencyString(SteamCurrency value){
+        switch(value){
+            case SteamCurrency::eUSD: return "USD";
+            case SteamCurrency::eEUR: return "EUR";
+            case SteamCurrency::eRUB: return "RUB";
+            default: return "Unknown currency";
+        }
+    }
+
     struct Parser{
 
 

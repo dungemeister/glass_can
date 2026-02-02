@@ -29,6 +29,8 @@ public:
     bool addUserItemBuyInfo(uint64_t chat_id, const UserContext::ItemBuyInfo& info);
     nlohmann::json deleteUserItemBuyInfo(uint64_t chat_id, const std::string& title);
     nlohmann::json getUserItemsBuyInfo(uint64_t chat_id);
+
+    nlohmann::json setUserCurrency(uint64_t chat_id, const std::string& currency);
 private:
     std::string m_file;
     sqlite3* m_db;

@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <tuple>
 #include <string>
+#include <functional>
 
 class BotContext{
 public:
@@ -27,9 +28,16 @@ public:
         STEAM_PURCHASE_LIST_ADD_LINK_AMOUNT,
         STEAM_PURCHASE_LIST_ADD_LINK_DATE,
         STEAM_PURCHASE_LIST_DELETE_LINK,
+        //Separate Bot Commands
+        SET_USER_CURRENCY,
     };
     using UserContext = std::tuple<BotState, std::string>;
-    
+    enum BotCommandTupleIndex{
+        Function = 0,
+        Description = 1
+    };
+    using BotCommand = std::tuple<std::function<void(uint64_t chat_id)>, std::string>;
+
     BotContext();
 
     void setUserContext(uint64_t chat_id, UserContext context);

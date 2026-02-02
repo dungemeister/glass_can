@@ -17,14 +17,29 @@ void TgBot::initRequestsTable(){
         {TgAPIRequest::eGET_FILE,              {"getFile",               RequestType::eGET}},
         {TgAPIRequest::eSET_CHAT_MENU_BUTTON,  {"setChatMenuButton",     RequestType::ePOST}},
         {TgAPIRequest::eGET_AVAILABLE_GIFTS,   {"getAvailableGifts",     RequestType::eGET}},
+        {TgAPIRequest::eSET_MY_COMMANDS,       {"setMyCommands",         RequestType::ePOST}},
 
     };
 }
 
 void TgBot::initCommandList(){
     m_commands_map = {
-        {"/start", [this](uint64_t chat_id){ sendMessage(chat_id, "Выбери список", mainMenu(), ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");}},
-        {"/ping" , [this](uint64_t chat_id){ sendMessage(chat_id, "pong"         , {}        , ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");}},
+        {"/start", {
+                    [this](uint64_t chat_id){ sendMessage(chat_id, "Выбери список", mainMenu(), ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");},
+                    "Команда для сброса состояния бота"}
+        },
+
+        {"/ping" , {
+                    [this](uint64_t chat_id){ sendMessage(chat_id, "pong"         , {}        , ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");},
+                    "Проверка доступности бота"}
+        },
+        {"/setcurrency" , {
+                    [this](uint64_t chat_id){
+                    sendMessage(chat_id, "Введи код валюты: USD - 1, EUR - 3, RUB - 5", {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "-.,");
+                    m_context.switchState(chat_id, BotContext::BotState::SET_USER_CURRENCY);
+                    },
+                    "Установка валюты пользователя"}
+        },
     };
 }
 
@@ -225,7 +240,7 @@ void TgBot::handleText(uint64_t chat_id, const std::string& text){
             sendMessage(chat_id, "Неизвестная команда");
         }
         else{
-            auto handler = it->second;
+            auto handler = std::get<BotContext::BotCommandTupleIndex::Function>(it->second);
             handler(chat_id);
         }
         return;
@@ -304,7 +319,25 @@ void TgBot::handleText(uint64_t chat_id, const std::string& text){
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
 
             }
-
+        }
+        break;
+        case BotContext::BotState::SET_USER_CURRENCY:
+        {
+            auto val = std::atoi(text.c_str());
+            if(auto cur = ENUM_VALID_CAST(PriceOverview::SteamCurrency, val)){
+                auto cur_str = getSteamCurrencyString(*cur);
+                auto res = m_sqlite_db->setUserCurrency(chat_id, cur_str);
+                if(res["ok"].get<bool>()){
+                    sendMessage(chat_id, "Валюта " + cur_str + " установлена", steamMenu());
+                }
+                else{
+                    sendMessage(chat_id, "Ошибка: " + res["error_msg"].get<std::string>(), steamMenu());
+                }
+            }
+            else{
+                sendMessage(chat_id, "Ошибка: невалидное значение валюты " + std::to_string(val), steamMenu());
+            }
+            m_context.switchState(chat_id, BotContext::BotState::STEAM_MENU);
         }
         break;
         default: break;
@@ -323,6 +356,8 @@ void TgBot::loop(){
     }
     
     auto commands = getMyCommands();
+    updateBotCommands(commands);
+
     auto gifts = getAvailableGifts().dump();
 
     uint64_t offset = 0;
@@ -381,6 +416,28 @@ json TgBot::getMyCommands(){
     }
     catch (const std::exception& e){
         std::cerr << "ERROR: getMyCommands: " << e.what() << std::endl;
+        return {};
+    }
+}
+
+json TgBot::setMyCommands(){
+    try{
+        json updated_commands = json::array();
+        for(auto& bot_command: m_commands_map){
+            auto& cmd_name = bot_command.first;
+            auto& cmd_description = std::get<BotContext::BotCommandTupleIndex::Description>(bot_command.second);
+
+            updated_commands.push_back({{"command", cmd_name}, {"description", cmd_description}});
+        }
+
+        json params = {
+                        {"commands", updated_commands}
+                    };
+        return callRequest(TgAPIRequest::eSET_MY_COMMANDS, params);
+
+    }
+    catch(const std::exception& e){
+        std::cerr << "ERROR: setMyCommands: " << e.what() << std::endl;
         return {};
     }
 }
@@ -1008,4 +1065,28 @@ std::string TgBot::getUserItemPriceAnalysys(const json& link, const json& price)
           "Текущий профит (% с учетом комиссии): *" << static_cast<float>((100 * (cur_price - profit_price)) / buy_price) << "%*";
     auto prepared_out = StringMisc::escapeString(ss.str(), "().,-");
     return markdown_link + "\n" + prepared_out;
+}
+
+void TgBot::updateBotCommands(const json& commands){
+    bool update = false;
+    for(auto& bot_command: m_commands_map){
+        auto& defined_cmd = bot_command.first;
+        bool found = false;
+        for(auto& req_command: commands){
+            if(auto requested_cmd = req_command.value("name", ""); requested_cmd != ""){
+                std::cout << "Found command " << defined_cmd << std::endl;
+                found = true;
+                break;
+            }
+
+        }
+        if(!found){
+            std::cout << "Command " << defined_cmd << " not found" << std::endl;
+            update = true;
+            break;
+        }
+    }
+    if(update){
+        setMyCommands();
+    }
 }
