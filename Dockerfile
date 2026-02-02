@@ -23,6 +23,7 @@ RUN cd third_party/curlpp && \
     ln -sf libcurlpp.so.1.0.0 libcurlpp.so.1 && \
     ln -sf libcurlpp.so.1.0.0 libcurlpp.so
 #  COPY --from=builder /app/build/your_app /usr/local/bin/
- CMD ["/app/build/glass_can"]
+CMD ["sh", "/app/start.sh"]
+
 
 
