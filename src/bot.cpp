@@ -300,6 +300,9 @@ void TgBot::handleText(uint64_t chat_id, const std::string& text){
         {
             auto& info = m_user_buy_item_info[chat_id];
             try{
+                info.user_link = StringMisc::sqlQuoteShielding(info.user_link);
+                info.title = StringMisc::sqlQuoteShielding(info.title);
+
                 std::stringstream amount_ss;
                 amount_ss << text;
                 amount_ss >> m_user_buy_item_info[chat_id].amount;
@@ -589,7 +592,7 @@ bool TgBot::setChatMenuButton(uint64_t chat_id){
 }
 
 void TgBot::initDatabase(){
-    m_sqlite_db = std::make_unique<DataBase>("steam.db");
+    m_sqlite_db = std::make_unique<DataBase>("db/steam.db");
 }
 
 json TgBot::getAvailableGifts(){
@@ -925,8 +928,8 @@ void TgBot::handleCallbackQuery(const json& callback){
 
 bool TgBot::addSteamLink(uint64_t chat_id, const std::string& line){
     auto sep_index = line.find("#");
-    auto link = line.substr(0, sep_index - 1);
-    auto title = line.substr(sep_index + 2);
+    auto link = StringMisc::sqlQuoteShielding(line.substr(0, sep_index - 1));
+    auto title = StringMisc::sqlQuoteShielding(line.substr(sep_index + 2));
     std::cout << "Adding to " << chat_id << " " << link << " " << title << std::endl;
     return m_sqlite_db->addUserLink(chat_id, link, title);
 }

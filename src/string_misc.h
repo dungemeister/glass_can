@@ -124,4 +124,17 @@ namespace StringMisc{
             return {};
         }
     }
+    static std::string sqlQuoteShielding(const std::string& input){
+        std::string result;
+        result.reserve(input.size() * 2); 
+        
+        for (char c : input) {
+            if (c == '\'') {
+                result += '\'';
+            }
+            result += c;
+        }
+        
+        return result;
+    }
 }

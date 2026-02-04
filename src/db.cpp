@@ -2,7 +2,6 @@
 #include <iostream>
 #include <sstream>
 
-
 DataBase::DataBase(const std::string& file)
 :m_file(file)
 {
@@ -183,7 +182,7 @@ bool DataBase::addUserItemBuyInfo(uint64_t chat_id, const UserContext::ItemBuyIn
 
         std::stringstream q;
         q << "INSERT INTO items_buy_info (user_id, url, title, buy_price, amount, date) " <<
-             "VALUES (" << user_id << ", '" << StringMisc::removeQuotes(row["url"]) << "', '" << info.title << "', '" <<
+             "VALUES (" << user_id << ", '" << StringMisc::sqlQuoteShielding(StringMisc::removeQuotes(row["url"])) << "', '" << info.title << "', '" <<
                            info.buy_price << "', '" << info.amount << "', '" << info.buy_date << "');";
         exec(q.str());
         return true;
