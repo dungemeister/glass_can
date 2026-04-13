@@ -72,7 +72,10 @@ namespace StringMisc{
     static std::string createMarkdownLink(const std::string& url, const std::string& text){
         std::stringstream out;
         auto text_copy = removeQuotes(text);
+        text_copy = escapeString(text_copy, "_~>#+-=|{}.!()");
+        
         auto url_copy  = removeQuotes(url);
+        url_copy = escapeString(url_copy, "()");
 
         out << "[" << text_copy << "](" << url_copy << ")";
 
