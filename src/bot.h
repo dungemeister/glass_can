@@ -131,12 +131,12 @@ private:
     const std::string c_steam_menu_string                 = "steam_menu";
     const std::string c_steam_purchase_list_menu_string   = "steam_purchased_list_menu";
     const std::string c_steam_watch_list_menu_string      = "steam_watch_list_menu";
-
+    //Watch list commands
     const std::string c_steam_add_watch_list_string                = "steam_wl_add";
     const std::string c_steam_delete_watch_list_string             = "steam_wl_delete";
     const std::string c_steam_list_watch_list_string               = "steam_wl_list";
     const std::string c_steam_info_watch_list_string               = "steam_wl_info";
-
+    //Purchase list commands
     const std::string c_steam_add_purchased_item_string            = "steam_pl_add_buy_info";
     const std::string c_steam_delete_purchased_item_string         = "steam_pl_delete_buy_info";
     const std::string c_steam_purchased_item_info_string           = "steam_pl_items_buy_info";
@@ -145,5 +145,7 @@ private:
     const std::string c_steam_app_id        = "730"; //CS2 app id
 
     const PriceOverview::SteamCurrency c_steam_currency = PriceOverview::SteamCurrency::eUSD; //Current steam currency
+
+    void deletePurchasedItem(int chat_id);
     
 };

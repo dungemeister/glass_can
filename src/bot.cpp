@@ -5,6 +5,7 @@
 #include <thread>
 #include <fstream>
 #include <iomanip>
+#include <string>
 
 void TgBot::initRequestsTable(){
     m_requests_table = {
@@ -181,8 +182,9 @@ void TgBot::handleUpdate(const json& update){
     }
 }
 
-bool TgBot::sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard={}, ParseMode mode=ParseMode::eMARKDOWN_V2, MessageWebPreview web_preview=eENABLE_WEB_PREVIEW,
-                       const std::string& espace_symbols="_~>#+-=|{}.!"){
+bool TgBot::sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard={},
+                        ParseMode mode=ParseMode::eMARKDOWN_V2, MessageWebPreview web_preview=eENABLE_WEB_PREVIEW,
+                        const std::string& espace_symbols="_~>#+-=|{}.!"){
     
     auto prepared_text = StringMisc::escapeString(text, espace_symbols);
     std::cout << prepared_text << std::endl;
@@ -881,11 +883,39 @@ void TgBot::handleCallbackQuery(const json& callback){
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
                 return;
             }
+            else if(data.get<std::string>() == c_steam_purchased_item_info_string){
+                std::cout << "Requested purchased items info" << std::endl;
+                auto db_res = m_sqlite_db->getUserItemsBuyInfo(chat_id);
+                auto& links = db_res["data"];
+                if(db_res["ok"].get<bool>()){
+                    int counter = 0;
+                    for(auto& link: links){
+                        std::stringstream out;
+
+                        out << counter++ << ". " << link["title"] << "| "
+                            << "*" << link["amount"] << "*" << "шт| " 
+                            << "*" << link["buy_price"] << "*" << std::endl;
+                        std::string prepared_str = StringMisc::escapeString(out.str(), "_~>#+-=|{}.!()");
+                        prepared_str = StringMisc::removeQuotes(prepared_str);
+                        sendMessage(chat_id, prepared_str, {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");
+
+                    }
+                    sendMessage(chat_id, "*Список покупок*", steamPurchaseListMenu(), ParseMode::eMARKDOWN_V2);
+                }
+                else {
+                    sendMessage(chat_id, "Ошибка: " + res["error_msg"].get<std::string>(), steamPurchaseListMenu());
+                }
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
+            }
+            else if(data.get<std::string>() == c_steam_delete_purchased_item_string){
+                deletePurchasedItem(chat_id);
+            }
         }
         //Send menu to delete user's item from purchased list
         if(user_bot_state == BotContext::BotContext::STEAM_WATCH_LIST_DELETE_LINK){
             if(callback.contains("data")){
                 std::string data = callback["data"];
+                data = StringMisc::escapeString(data, "_~>#+-=|{}.!()");
                 auto& callback_id = callback["id"];
                 auto res = callMethod("answerCallbackQuery", RequestType::ePOST, {
                                     {"callback_query_id", callback_id}
@@ -919,8 +949,30 @@ void TgBot::handleCallbackQuery(const json& callback){
             }
             return;
         }
-        
+        else if(user_bot_state == BotContext::BotContext::STEAM_PURCHASE_LIST_DELETE_LINK)
+        {
+            std::string data = callback["data"];
+            std::cout << data << std::endl;
+            auto tokens = StringMisc::splitByDelim(data, '|');
+            std::stringstream out;
+            out << std::fixed << std::setprecision(2) << std::stof(tokens[3]);
+            float buy_value = std::stof(out.str());
+            int amount = std::atoi(tokens[2].c_str());
+
+            auto res = m_sqlite_db->deleteUserItemBuyInfo(chat_id, tokens[1], buy_value, amount);
+            if(res["ok"]){
+
+                sendMessage(chat_id, "OK", steamPurchaseListMenu());
+            }
+            else {
+                sendMessage(chat_id, res["error_msg"], steamPurchaseListMenu());
+
+            }
+            m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
+        }
     }
+        
+    
     catch(const std::exception& e){
         std::cerr << "handleCallbackQuery: " << e.what() << std::endl;
     }
@@ -1092,4 +1144,24 @@ void TgBot::updateBotCommands(const json& commands){
     if(update){
         setMyCommands();
     }
+}
+
+void TgBot::deletePurchasedItem(int chat_id){
+    auto db_res = m_sqlite_db->getUserItemsBuyInfo(chat_id);
+    auto& links = db_res["data"];
+    std::vector<std::string> buttons;
+    int counter = 0;
+    for(auto& link: links){
+        std::stringstream out;
+        out << counter++ << "|" << link["title"] << "|"
+                        << link["amount"] << "|" 
+                        << link["buy_price"] << std::endl;
+        // std::string title = link["title"];
+        buttons.emplace_back(StringMisc::removeQuotes(out.str()));
+    }
+    auto keyboard = createInlineKeyboard(buttons, "", 1);
+    keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_purchase_list_menu_string}} });
+    sendMessage(chat_id, "Выбери какую ссылку удалить", keyboard);
+    // sendMessage(chat_id, "*Steam Menu*", steamMenu());
+    m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_DELETE_LINK);
 }

@@ -140,4 +140,17 @@ namespace StringMisc{
         
         return result;
     }
+
+    static std::vector<std::string> splitByDelim(const std::string& input, char delim){
+        std::vector<std::string> tokens;
+        std::string token;
+        std::stringstream sstream(input);
+
+        while(std::getline(sstream, token, delim)){
+            std::cout << token << std::endl;
+            tokens.push_back(std::move(token));
+        }
+
+        return tokens;
+    }
 }

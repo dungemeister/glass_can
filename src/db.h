@@ -27,7 +27,7 @@ public:
     bool deleteUserLink(uint64_t chat_id, const std::string& title);
 
     bool addUserItemBuyInfo(uint64_t chat_id, const UserContext::ItemBuyInfo& info);
-    nlohmann::json deleteUserItemBuyInfo(uint64_t chat_id, const std::string& title);
+    nlohmann::json deleteUserItemBuyInfo(uint64_t chat_id, const std::string& title, float buy_price, int amount);
     nlohmann::json getUserItemsBuyInfo(uint64_t chat_id);
 
     nlohmann::json setUserCurrency(uint64_t chat_id, const std::string& currency);

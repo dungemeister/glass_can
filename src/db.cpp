@@ -193,13 +193,16 @@ bool DataBase::addUserItemBuyInfo(uint64_t chat_id, const UserContext::ItemBuyIn
     }
 }
 
-nlohmann::json DataBase::deleteUserItemBuyInfo(uint64_t chat_id, const std::string& title){
+nlohmann::json DataBase::deleteUserItemBuyInfo(uint64_t chat_id, const std::string& title, float buy_price, int amount){
     nlohmann::json result;
     try{
         auto user_id = getUserId(chat_id);
         std::stringstream q;
-        q << "DELETE FROM items_buy_info WHERE title = '" << title << "'" <<
-             "AND user_id = " << user_id << ";";
+        q  << std::fixed << std::setprecision(2) <<
+             "DELETE FROM items_buy_info WHERE title = '" << title << "'" <<
+             "AND user_id = " << user_id <<
+             " AND buy_price = " << buy_price <<
+             " AND amount = " << amount << ";";
              
         exec(q.str());
         result["data"] = nlohmann::json::array();
