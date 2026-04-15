@@ -11,7 +11,9 @@ WorkerPool::WorkerPool(size_t workers)
                 {
                     std::unique_lock<std::mutex> lock(m_mutex);
 
-                    m_cv.wait(lock);
+                    m_cv.wait(lock, [this]{
+                        return !m_tasks.empty() || m_stop;
+                    });
                     
                     if(m_stop) return;
 
@@ -36,7 +38,7 @@ void WorkerPool::enqueue(Task task){
         std::unique_lock<std::mutex>lock(m_mutex);
         m_tasks.emplace(std::move(task));
     }
-    m_cv.notify_one();
+    m_cv.notify_all();
 
 }
 
@@ -45,6 +47,19 @@ inline WorkerPool::Task WorkerPool::dequeue(){
     m_tasks.pop();
 
     return task;
+}
+
+void WorkerPool::stop(){
+    {
+        std::unique_lock<std::mutex>lock(m_mutex);
+        m_stop = true;
+    }
+    m_cv.notify_all();
+
+    for(auto& t: m_workers){
+        if(t.joinable()) t.join();
+    }
+    
 }
 
 void WorkerPool::setPoolState(bool state){
