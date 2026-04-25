@@ -12,6 +12,7 @@ void TgBot::initRequestsTable(){
         {TgAPIRequest::eGET_UPDATES,           {"getUpdates",            RequestType::eGET}},
         {TgAPIRequest::eGET_ME,                {"getMe",                 RequestType::eGET}},
         {TgAPIRequest::eSEND_MESSAGE,          {"sendMessage",           RequestType::ePOST}},
+        {TgAPIRequest::eEDIT_MESSAGE,          {"editMessageText",       RequestType::ePOST}},
         {TgAPIRequest::eFORWARD_MESSAGE,       {"forwardMessage",        RequestType::ePOST}},
         {TgAPIRequest::eFORWARD_MESSAGES,      {"forwardMessages",       RequestType::ePOST}},
         {TgAPIRequest::eGET_MY_COMMANDS,       {"getMyCommands",         RequestType::eGET}},
@@ -208,6 +209,33 @@ bool TgBot::sendMessage(uint64_t chat_id, const std::string& text, const json& i
     }
 }
 
+bool TgBot::editMessageText(uint64_t chat_id, uint64_t message_id, const std::string& text, const json& inline_keyboard={},
+                        ParseMode mode=ParseMode::eMARKDOWN_V2, MessageWebPreview web_preview=eENABLE_WEB_PREVIEW,
+                        const std::string& espace_symbols="_~>#+-=|{}.!"){
+
+    auto prepared_text = StringMisc::escapeString(text, espace_symbols);
+    std::cout << prepared_text << std::endl;
+    json params = {
+        {"chat_id", chat_id},
+        {"message_id", message_id},
+        {"text", prepared_text},
+        {"parse_mode", (mode == ParseMode::eMARKDOWN_V2)? "MarkdownV2":"HTML"},
+    };
+    if(web_preview == MessageWebPreview::eDISABLE_WEB_PREVIEW){
+        params["disable_web_page_preview"] = true;
+    }
+    if(!inline_keyboard.empty())
+        params["reply_markup"] = inline_keyboard;
+    try{
+        callRequest(TgAPIRequest::eEDIT_MESSAGE, params);
+        return true;
+    }
+    catch(const std::exception& e){
+        std::cerr << "editMessageText: " << e.what() << std::endl;
+        return false;
+    }
+
+}
 void TgBot::getBotname(){
 
 }
@@ -364,6 +392,7 @@ void TgBot::loop(){
     updateBotCommands(commands);
 
     auto gifts = getAvailableGifts().dump();
+
 
     uint64_t offset = 0;
     while(true){
@@ -739,173 +768,33 @@ void TgBot::handleCallbackQuery(const json& callback){
             // Steam watch list
             //Get user links list from Steam watch list
             else if(data.get<std::string>() == c_steam_list_watch_list_string){
-                auto links = m_sqlite_db->getUserLinks(chat_id);
-                
-                std::cout << "Requested watch list from " << username << std::endl;
-                size_t index = 1;
-                std::stringstream out;
-                out << "🎮Steam список:\n";
-                for(const auto& link: links){
-                    out << index++ << " - " << convertUserLinkMinimal(link) << std::endl;
-                }
-                // auto out = StringMisc::createMarkdownLinkTable(links);
-                m_context.switchState(chat_id, BotContext::BotState::STEAM_LIST_WATCH_LIST_LINKS);
-                sendMessage(chat_id, out.str() + "*Steam Menu*", steamWatchListMenu(), ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW);
-                return;
+                getWatchListItemsList(chat_id);
             }
             //Send message to add link to Steam watch list
             else if(data.get<std::string>() == c_steam_add_watch_list_string){
-                callMethod("editMessageText", RequestType::ePOST, {
-                            {"chat_id", chat_id},
-                            {"message_id", message_id},
-                            {"text", "*Steam Add Link Menu*\n Отправь ссылку для отслеживания в формате 'https://example\\.com \\# CS2 Spectrum case'"},
-                            {"parse_mode", "MarkdownV2"},
-                            {"reply_markup", steamWatchListAddLinkMenu()}
-
-                            });
-                
-                m_context.switchState(chat_id, BotContext::BotState::STEAM_WATCH_LIST_ADD_LINK);
-                return;
+                sendWatchListAddLinkMessage(chat_id, message_id);
             }
             //Send current items info from Steam watch list
             else if(data.get<std::string>() == c_steam_info_watch_list_string){
-                auto links = m_sqlite_db->getUserLinks(chat_id);
-                if(links.size() > 0){
-                    for(const auto& link: links){
-                        auto markdown_link = StringMisc::createMarkdownLink(link["url"], StringMisc::escapeString(StringMisc::uriToString(link["title"])));
-                        auto result = getUserLinkPriceOverview(link);
-                        auto item_name = StringMisc::escapeString(result["caption"].get<std::string>(), "-(){}|.,=");
-                        try {
-                            auto png_path = getUserItemChart(link);
-
-                            std::stringstream caption;
-                            caption << "График \"" << item_name << "\"\n" <<
-                                       markdown_link << "\n" <<
-                                       StringMisc::escapeString(result["data"]) << std::endl;
-                            if(png_path.empty()){
-                                std::cerr << "ERROR: Fail to get png_file path" << std::endl;
-                                sendMessage(chat_id, caption.str(), {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");
-                                continue;
-                            }
-                            auto response = sendPhotoFile(chat_id, png_path, caption.str());
-                            auto json = nlohmann::json::parse(response);
-                            if (json["ok"].get<bool>()) {
-                                std::cout << "Photo sent with file_id: " << json["result"]["photo"][0]["file_id"] << std::endl;
-                            } else {
-                                std::cerr << "Error: " << json["description"] << std::endl;
-                            }
-                        } catch (...) {
-                            std::cerr << " JSON парсинг ошибка" << std::endl;
-                        }
-                    }
-                    sendMessage(chat_id, "*Список наблюдения*", steamWatchListMenu());
-                }
-                else{
-
-                    sendMessage(chat_id, "*Список наблюдения пуст*", steamWatchListMenu());
-                }
-                m_context.switchState(chat_id, BotContext::BotState::STEAM_WATCH_LIST_MENU);
-                return;
+                getWatchListItemsData(chat_id);
             }
 
             //Send menu to delete from Steam watch list
             else if(data.get<std::string>() == c_steam_delete_watch_list_string){
-                auto links = m_sqlite_db->getUserLinks(chat_id);
-                if(links.size() <= 0){
-                    sendMessage(chat_id, "Список пустой", steamWatchListMenu());
-                    m_context.switchState(chat_id, BotContext::BotState::STEAM_WATCH_LIST_MENU);
-                }
-                else{
-                    std::vector<std::string> buttons;
-                    for(auto& link: links){
-                        std::string title = link["title"];
-                        buttons.emplace_back(title);
-                    }
-                    auto keyboard = createInlineKeyboard(buttons, "", 2);
-                    keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_watch_list_menu_string}} });
-                    sendMessage(chat_id, "Выбери какую ссылку удалить", keyboard);
-                    // sendMessage(chat_id, "*Steam Menu*", steamMenu());
-                    m_context.switchState(chat_id, BotContext::BotState::STEAM_WATCH_LIST_DELETE_LINK);
-                }
-                return;
+                sendWatchListDeleteMenu(chat_id);
             }
             
             //Steam purchased list
             //Send menu to add item to user's Steam purchased list
             else if(data.get<std::string>() == c_steam_add_purchased_item_string){
-                auto links = m_sqlite_db->getUserLinks(chat_id);
-                if(links.size() <= 0){
-                    sendMessage(chat_id, "Список пустой", steamPurchaseListMenu());
-                    m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
-                }
-                else{
-                    std::vector<std::string> buttons;
-                    for(auto& link: links){
-                        std::string title = link["title"];
-                        buttons.emplace_back(title);
-                    }
-                    auto keyboard = createInlineKeyboard(buttons, "", 2);
-                    keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_purchase_list_menu_string}} });
-                    sendMessage(chat_id, "Выбери ссылку для добавления информации", keyboard);
-                    // sendMessage(chat_id, "*Steam Menu*", steamMenu());
-                    m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_ADD_LINK_TITLE);
-                }
-                return;
+                sendPurchasedItemsMenu(chat_id);
             }
             //Send list of items from user's purchased list
             else if(data.get<std::string>() == c_steam_list_purchased_items_string){
-                std::cout << "Requested purchased list from " << username << std::endl;
-                auto db_res = m_sqlite_db->getUserItemsBuyInfo(chat_id);
-                auto& links = db_res["data"];
-                
-                if(db_res["ok"].get<bool>()){
-                    if(links.size() < 0){
-                        sendMessage(chat_id, "Список о запупках пуст", steamPurchaseListMenu());
-                        m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
-                        return;
-                    }
-                    for(auto& link: links){
-                        std::cout << "\t" << link["url"] << ": " << link["title"] << std::endl;
-                        auto price_res = getUserLinkPriceOverview(link);
-                        auto temp = price_res.dump();
-                        if(price_res["json"]["lowest_price"].is_null()){
-
-                            sendMessage(chat_id, "Ошибка запроса: " + link["url"].get<std::string>(), {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW);                            continue;
-                        }
-                        auto out = getUserItemPriceAnalysys(link, price_res["json"]);
-                        sendMessage(chat_id, out, {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");
-                    }
-                    sendMessage(chat_id, "*Список покупок*", steamPurchaseListMenu(), ParseMode::eMARKDOWN_V2);
-                }
-                else{
-                    sendMessage(chat_id, "Ошибка: " + res["error_msg"].get<std::string>(), steamPurchaseListMenu());
-                }
-                m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
-                return;
+                getPurchasedItemsData(chat_id, res["error_msg"].get<std::string>());
             }
             else if(data.get<std::string>() == c_steam_purchased_item_info_string){
-                std::cout << "Requested purchased items info" << std::endl;
-                auto db_res = m_sqlite_db->getUserItemsBuyInfo(chat_id);
-                auto& links = db_res["data"];
-                if(db_res["ok"].get<bool>()){
-                    int counter = 0;
-                    for(auto& link: links){
-                        std::stringstream out;
-
-                        out << counter++ << ". " << link["title"] << "| "
-                            << "*" << link["amount"] << "*" << "шт| " 
-                            << "*" << link["buy_price"] << "*" << std::endl;
-                        std::string prepared_str = StringMisc::escapeString(out.str(), "_~>#+-=|{}.!()");
-                        prepared_str = StringMisc::removeQuotes(prepared_str);
-                        sendMessage(chat_id, prepared_str, {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");
-
-                    }
-                    sendMessage(chat_id, "*Список покупок*", steamPurchaseListMenu(), ParseMode::eMARKDOWN_V2);
-                }
-                else {
-                    sendMessage(chat_id, "Ошибка: " + res["error_msg"].get<std::string>(), steamPurchaseListMenu());
-                }
-                m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
+                getPurchasedItemsList(chat_id, res["error_msg"].get<std::string>());
             }
             else if(data.get<std::string>() == c_steam_delete_purchased_item_string){
                 deletePurchasedItem(chat_id);
@@ -1164,4 +1053,167 @@ void TgBot::deletePurchasedItem(int chat_id){
     sendMessage(chat_id, "Выбери какую ссылку удалить", keyboard);
     // sendMessage(chat_id, "*Steam Menu*", steamMenu());
     m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_DELETE_LINK);
+}
+
+void TgBot::getPurchasedItemsList(int chat_id, const std::string& error_msg){
+    std::cout << "Requested purchased items info" << std::endl;
+    auto db_res = m_sqlite_db->getUserItemsBuyInfo(chat_id);
+    auto& links = db_res["data"];
+    if(db_res["ok"].get<bool>()){
+        int counter = 0;
+        for(auto& link: links){
+            std::stringstream out;
+
+            out << counter++ << ". " << link["title"] << "| "
+                << "*" << link["amount"] << "*" << "шт| " 
+                << "*" << link["buy_price"] << "*" << std::endl;
+            std::string prepared_str = StringMisc::escapeString(out.str(), "_~>#+-=|{}.!()");
+            prepared_str = StringMisc::removeQuotes(prepared_str);
+            sendMessage(chat_id, prepared_str, {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");
+
+        }
+        sendMessage(chat_id, "*Список покупок*", steamPurchaseListMenu(), ParseMode::eMARKDOWN_V2);
+    }
+    else {
+        sendMessage(chat_id, "Ошибка: " + error_msg, steamPurchaseListMenu());
+    }
+    m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
+}
+
+void TgBot::getPurchasedItemsData(int chat_id, const std::string& error_msg){
+    auto db_res = m_sqlite_db->getUserItemsBuyInfo(chat_id);
+    auto& links = db_res["data"];
+    
+    if(db_res["ok"].get<bool>()){
+        if(links.size() < 0){
+            sendMessage(chat_id, "Список о запупках пуст", steamPurchaseListMenu());
+            m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
+            return;
+        }
+        for(auto& link: links){
+            std::cout << "\t" << link["url"] << ": " << link["title"] << std::endl;
+            auto price_res = getUserLinkPriceOverview(link);
+            auto temp = price_res.dump();
+            if(price_res["json"]["lowest_price"].is_null()){
+
+                sendMessage(chat_id, "Ошибка запроса: " + link["url"].get<std::string>(), {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW);                            continue;
+            }
+            auto out = getUserItemPriceAnalysys(link, price_res["json"]);
+            sendMessage(chat_id, out, {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");
+        }
+        sendMessage(chat_id, "*Список покупок*", steamPurchaseListMenu(), ParseMode::eMARKDOWN_V2);
+    }
+    else{
+        sendMessage(chat_id, "Ошибка: " + error_msg, steamPurchaseListMenu());
+    }
+    m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
+}
+
+void TgBot::sendPurchasedItemsMenu(int chat_id){
+    auto links = m_sqlite_db->getUserLinks(chat_id);
+    if(links.size() <= 0){
+        sendMessage(chat_id, "Список пустой", steamPurchaseListMenu());
+        m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
+    }
+    else{
+        std::vector<std::string> buttons;
+        for(auto& link: links){
+            std::string title = link["title"];
+            buttons.emplace_back(title);
+        }
+        auto keyboard = createInlineKeyboard(buttons, "", 2);
+        keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_purchase_list_menu_string}} });
+        sendMessage(chat_id, "Выбери ссылку для добавления информации", keyboard);
+        // sendMessage(chat_id, "*Steam Menu*", steamMenu());
+        m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_ADD_LINK_TITLE);
+    }
+}
+
+void TgBot::sendWatchListDeleteMenu(int chat_id){
+    auto links = m_sqlite_db->getUserLinks(chat_id);
+    if(links.size() <= 0){
+        sendMessage(chat_id, "Список пустой", steamWatchListMenu());
+        m_context.switchState(chat_id, BotContext::BotState::STEAM_WATCH_LIST_MENU);
+    }
+    else{
+        std::vector<std::string> buttons;
+        for(auto& link: links){
+            std::string title = link["title"];
+            buttons.emplace_back(title);
+        }
+        auto keyboard = createInlineKeyboard(buttons, "", 2);
+        keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_watch_list_menu_string}} });
+        sendMessage(chat_id, "Выбери какую ссылку удалить", keyboard);
+        // sendMessage(chat_id, "*Steam Menu*", steamMenu());
+        m_context.switchState(chat_id, BotContext::BotState::STEAM_WATCH_LIST_DELETE_LINK);
+    }
+}
+
+void TgBot::getWatchListItemsData(int chat_id){
+
+    auto links = m_sqlite_db->getUserLinks(chat_id);
+    if(links.size() > 0){
+        for(const auto& link: links){
+            auto markdown_link = StringMisc::createMarkdownLink(link["url"], StringMisc::escapeString(StringMisc::uriToString(link["title"])));
+            auto result = getUserLinkPriceOverview(link);
+            auto item_name = StringMisc::escapeString(result["caption"].get<std::string>(), "-(){}|.,=");
+            try {
+                auto png_path = getUserItemChart(link);
+
+                std::stringstream caption;
+                caption << "График \"" << item_name << "\"\n" <<
+                            markdown_link << "\n" <<
+                            StringMisc::escapeString(result["data"]) << std::endl;
+                if(png_path.empty()){
+                    std::cerr << "ERROR: Fail to get png_file path" << std::endl;
+                    sendMessage(chat_id, caption.str(), {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");
+                    continue;
+                }
+                auto response = sendPhotoFile(chat_id, png_path, caption.str());
+                auto json = nlohmann::json::parse(response);
+                if (json["ok"].get<bool>()) {
+                    std::cout << "Photo sent with file_id: " << json["result"]["photo"][0]["file_id"] << std::endl;
+                } else {
+                    std::cerr << "Error: " << json["description"] << std::endl;
+                }
+            } catch (...) {
+                std::cerr << " JSON парсинг ошибка" << std::endl;
+            }
+        }
+        sendMessage(chat_id, "*Список наблюдения*", steamWatchListMenu());
+    }
+    else{
+
+        sendMessage(chat_id, "*Список наблюдения пуст*", steamWatchListMenu());
+    }
+    m_context.switchState(chat_id, BotContext::BotState::STEAM_WATCH_LIST_MENU);
+}
+
+void TgBot::sendWatchListAddLinkMessage(int chat_id, int message_id){
+
+    std::string text = "*Steam Add Link Menu*\n Отправь ссылку для отслеживания в формате 'https://example.com # CS2 Spectrum case'";
+
+    auto res = editMessageText(chat_id, message_id, text, steamWatchListAddLinkMenu());
+
+    if(res){
+        m_context.switchState(chat_id, BotContext::BotState::STEAM_WATCH_LIST_ADD_LINK);
+    }
+    else{
+        m_context.switchState(chat_id, BotContext::BotState::STEAM_WATCH_LIST_ADD_LINK);
+        sendMessage(chat_id, "*Ошибка запроса*", steamWatchListMenu());
+    }
+}
+
+void TgBot::getWatchListItemsList(int chat_id){
+    auto links = m_sqlite_db->getUserLinks(chat_id);
+                
+    size_t index = 1;
+    std::stringstream out;
+    out << "🎮Steam список:\n";
+    for(const auto& link: links){
+        out << index++ << " - " << convertUserLinkMinimal(link) << std::endl;
+    }
+    // auto out = StringMisc::createMarkdownLinkTable(links);
+    m_context.switchState(chat_id, BotContext::BotState::STEAM_LIST_WATCH_LIST_LINKS);
+    sendMessage(chat_id, out.str() + "*Steam Menu*", steamWatchListMenu(), ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW);
 }

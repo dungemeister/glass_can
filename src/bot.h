@@ -28,6 +28,7 @@ public:
         eGET_UPDATES,
         eGET_ME,
         eSEND_MESSAGE,
+        eEDIT_MESSAGE,
         eFORWARD_MESSAGE,
         eFORWARD_MESSAGES,
         eGET_MY_COMMANDS,
@@ -69,7 +70,13 @@ private:
     
     json getUpdates(uint64_t offset);
     void handleUpdate(const json& update);
-    bool sendMessage(uint64_t chat_id, const std::string& text, const json& inline_keyboard, ParseMode mode, MessageWebPreview disable_web_preview, const std::string& espace_symbols);
+    bool sendMessage(uint64_t chat_id, const std::string& text,
+                     const json& inline_keyboard, ParseMode mode,
+                     MessageWebPreview disable_web_preview, const std::string& espace_symbols);
+    bool editMessageText(uint64_t chat_id, uint64_t message_id,
+                         const std::string& text, const json& inline_keyboard,
+                         ParseMode mode, MessageWebPreview web_preview,
+                         const std::string& espace_symbols);
     void getBotname();
     
     void getMe();
@@ -145,7 +152,14 @@ private:
     const std::string c_steam_app_id        = "730"; //CS2 app id
 
     const PriceOverview::SteamCurrency c_steam_currency = PriceOverview::SteamCurrency::eUSD; //Current steam currency
-
+    //PurchasedList
     void deletePurchasedItem(int chat_id);
-    
+    void getPurchasedItemsList(int chat_id, const std::string& error_msg);
+    void getPurchasedItemsData(int chat_id, const std::string& error_msg);
+    void sendPurchasedItemsMenu(int chat_id);
+    //WatchList
+    void sendWatchListDeleteMenu(int chat_id);
+    void getWatchListItemsData(int chat_id);
+    void sendWatchListAddLinkMessage(int chat_id, int message_id);
+    void getWatchListItemsList(int chat_id);    
 };
