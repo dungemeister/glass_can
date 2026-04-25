@@ -15,6 +15,7 @@ public:
         STEAM_MENU,
         STEAM_PURCHASE_LIST_MENU,
         STEAM_WATCH_LIST_MENU,
+        STEAM_SURVEY_LIST_MENU,
         OTHER_MENU,
         //Watch list
         STEAM_WATCH_LIST_ADD_LINK,

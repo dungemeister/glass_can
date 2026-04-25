@@ -650,6 +650,8 @@ json TgBot::steamMenu(){
 
                 { {{ "text", "🛒Список покупок"},                   {"callback_data", c_steam_purchase_list_menu_string}} },
                 { {{ "text", "👀Список отслеживания"},              {"callback_data", c_steam_watch_list_menu_string}} },
+                { {{ "text", "⏱️Список опросов"},                   {"callback_data", c_steam_survey_list_menu_string}} },
+                { {{ "text", "⏰Список уведомлений"},               {"callback_data", c_steam_notification_list_menu_string}} },
                 { {{ "text", "🔄В главное меню"},                   {"callback_data", c_main_menu_string}} },
             }}
             };
@@ -689,6 +691,18 @@ json TgBot::steamWatchListAddLinkMenu(){
                 { {{"text", "🔄В главное меню"}, {"callback_data", c_steam_watch_list_menu_string}} }
             }}
         };
+}
+
+json TgBot::steamSurveyListMenu(){
+    return {
+                {"inline_keyboard",{
+                    { {{"text", "📋Отобразить список"},                 {"callback_data", c_steam_survey_list_list_string}} },
+
+                    { {{ "text", "➕Добавить данные по закупке"},       {"callback_data", c_steam_survey_list_add_string}},
+                      {{ "text", "➖Удалить данные по закупке"},        {"callback_data", c_steam_survey_list_delete_string}}},
+                    { {{"text", "🔄В главное меню"},                    {"callback_data", c_steam_menu_string}} },
+                }}
+            };
 }
 
 void TgBot::handleCallbackQuery(const json& callback){
@@ -763,12 +777,24 @@ void TgBot::handleCallbackQuery(const json& callback){
                 }
                 return;
             }
+            //Send Survey List Menu to user
+            else if(data.get<std::string>() == c_steam_survey_list_menu_string){
+                callMethod("editMessageText", RequestType::ePOST, {
+                            {"chat_id", chat_id},
+                            {"message_id", message_id},
+                            {"text", "Меню списка периодических опросов"},
+                            {"parse_mode", "MarkdownV2"},
+                            {"reply_markup", steamSurveyListMenu()}
+
+                            });
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_SURVEY_LIST_MENU);
+                return;
+            }
 
             // Steam watch list
             //Get user links list from Steam watch list
             else if(data.get<std::string>() == c_steam_list_watch_list_string){
                 getWatchListItemsList(chat_id);
-                addPeriodicTask(chat_id, "steam list");
             }
             //Send message to add link to Steam watch list
             else if(data.get<std::string>() == c_steam_add_watch_list_string){
@@ -798,6 +824,12 @@ void TgBot::handleCallbackQuery(const json& callback){
             }
             else if(data.get<std::string>() == c_steam_delete_purchased_item_string){
                 deletePurchasedItem(chat_id);
+            }
+            else if(data.get<std::string>() == c_steam_survey_list_add_string){
+                addPeriodicTask(chat_id, "survey_steam_task");
+            }
+            else if(data.get<std::string>() == c_steam_survey_list_delete_string){
+                deletePeriodicTask(chat_id, 0);
             }
         }
         //Send menu to delete user's item from purchased list
@@ -1238,4 +1270,9 @@ void TgBot::addPeriodicTask(int chat_id, const std::string& taskname){
         .chat_id = chat_id,
     };
     m_periodic_pool.addTask(std::move(task));
+}
+
+void TgBot::deletePeriodicTask(int chat_id, uint64_t id){
+    m_periodic_pool.stopTask(id);
+    std::cout << "Stopped task " << id << std::endl;
 }

@@ -104,6 +104,7 @@ private:
     json steamWatchListMenu();
     json steamPurchaseListMenu();
     json steamWatchListAddLinkMenu();
+    json steamSurveyListMenu();
     
     nlohmann::json createInlineKeyboard(const std::vector<std::string>& buttons, const std::string& callback_prefix, int rows);
 
@@ -137,20 +138,27 @@ private:
     std::unordered_map<uint64_t, UserContext::ItemBuyInfo>                  m_user_buy_item_info;
     std::unordered_map<std::string, BotContext::BotCommand>                 m_commands_map;
 
-    const std::string c_main_menu_string                  = "main_menu";
-    const std::string c_steam_menu_string                 = "steam_menu";
-    const std::string c_steam_purchase_list_menu_string   = "steam_purchased_list_menu";
-    const std::string c_steam_watch_list_menu_string      = "steam_watch_list_menu";
+    const std::string c_main_menu_string                            = "main_menu";
+    const std::string c_steam_menu_string                           = "steam_menu";
+    const std::string c_steam_purchase_list_menu_string             = "steam_purchased_list_menu";
+    const std::string c_steam_watch_list_menu_string                = "steam_watch_list_menu";
+    const std::string c_steam_survey_list_menu_string               = "steam_survey_list_menu";
+    const std::string c_steam_notification_list_menu_string         = "steam_notification_list_menu";
     //Watch list commands
-    const std::string c_steam_add_watch_list_string                = "steam_wl_add";
-    const std::string c_steam_delete_watch_list_string             = "steam_wl_delete";
-    const std::string c_steam_list_watch_list_string               = "steam_wl_list";
-    const std::string c_steam_info_watch_list_string               = "steam_wl_info";
+    const std::string c_steam_add_watch_list_string                 = "steam_wl_add";
+    const std::string c_steam_delete_watch_list_string              = "steam_wl_delete";
+    const std::string c_steam_list_watch_list_string                = "steam_wl_list";
+    const std::string c_steam_info_watch_list_string                = "steam_wl_info";
     //Purchase list commands
-    const std::string c_steam_add_purchased_item_string            = "steam_pl_add_buy_info";
-    const std::string c_steam_delete_purchased_item_string         = "steam_pl_delete_buy_info";
-    const std::string c_steam_purchased_item_info_string           = "steam_pl_items_buy_info";
-    const std::string c_steam_list_purchased_items_string          = "steam_pl_list_items_purchased";
+    const std::string c_steam_add_purchased_item_string             = "steam_pl_add_buy_info";
+    const std::string c_steam_delete_purchased_item_string          = "steam_pl_delete_buy_info";
+    const std::string c_steam_purchased_item_info_string            = "steam_pl_items_buy_info";
+    const std::string c_steam_list_purchased_items_string           = "steam_pl_list_items_purchased";
+    //Survey list commands
+    const std::string c_steam_survey_list_add_string                = "steam_sl_add";
+    const std::string c_steam_survey_list_delete_string             = "steam_sl_delete";
+    const std::string c_steam_survey_list_list_string               = "steam_sl_list";
+    const std::string c_steam_survey_list_items_string              = "steam_sl_info";
     
     const std::string c_steam_app_id        = "730"; //CS2 app id
 
@@ -165,6 +173,7 @@ private:
     void getWatchListItemsData(int chat_id);
     void sendWatchListAddLinkMessage(int chat_id, int message_id);
     void getWatchListItemsList(int chat_id);
-
+    //SurveyList
     void addPeriodicTask(int chat_id, const std::string& taskname);
+    void deletePeriodicTask(int chat_id, uint64_t id);
 };

@@ -38,7 +38,7 @@ void PeriodicTasks::PeriodicPool::runPool(){
 
         std::vector<std::shared_ptr<PeriodicTaskDescriptor>> ready;
         ready.reserve(m_heap.size());
-        
+
         while(!m_heap.empty() && m_heap.top()->next_run <= now){
             auto task = m_heap.top();
             m_heap.pop();
@@ -86,6 +86,24 @@ void PeriodicTasks::PeriodicPool::pauseTask(uint64_t id){
     auto it = m_tasks.find(id);
     if(it != m_tasks.end()){
         it->second->paused = true;
+    }
+    m_cv.notify_one();
+}
+
+void PeriodicTasks::PeriodicPool::resumeTask(uint64_t id){
+    std::unique_lock lock(m_mutex);
+    auto it = m_tasks.find(id);
+    if(it != m_tasks.end()){
+        it->second->paused = false;
+    }
+    m_cv.notify_one();
+}
+
+void PeriodicTasks::PeriodicPool::stopTask(uint64_t id){
+    std::unique_lock lock(m_mutex);
+    auto it = m_tasks.find(id);
+    if(it != m_tasks.end()){
+        it->second->stopped = true;
     }
     m_cv.notify_one();
 }
