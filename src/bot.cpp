@@ -393,7 +393,6 @@ void TgBot::loop(){
 
     auto gifts = getAvailableGifts().dump();
 
-
     uint64_t offset = 0;
     while(true){
         auto updates = getUpdates(offset);
@@ -769,6 +768,7 @@ void TgBot::handleCallbackQuery(const json& callback){
             //Get user links list from Steam watch list
             else if(data.get<std::string>() == c_steam_list_watch_list_string){
                 getWatchListItemsList(chat_id);
+                addPeriodicTask(chat_id, "steam list");
             }
             //Send message to add link to Steam watch list
             else if(data.get<std::string>() == c_steam_add_watch_list_string){
@@ -1216,4 +1216,27 @@ void TgBot::getWatchListItemsList(int chat_id){
     // auto out = StringMisc::createMarkdownLinkTable(links);
     m_context.switchState(chat_id, BotContext::BotState::STEAM_LIST_WATCH_LIST_LINKS);
     sendMessage(chat_id, out.str() + "*Steam Menu*", steamWatchListMenu(), ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW);
+}
+
+void TgBot::addPeriodicTask(int chat_id, const std::string& taskname){
+    std::stringstream task_ss;
+    task_ss << "Task " << chat_id << ": " << taskname;
+    auto task_full_name = task_ss.str();
+
+    uint64_t task_period_ms = 2000;
+    PeriodicTasks::PeriodicTaskDescriptor task{
+        .id = 0,
+        .name = task_full_name,
+        .period = task_period_ms,
+        .next_run = PeriodicTasks::Clock::now(),
+        .paused = false,
+        .stopped = false,
+        .action = [&, task_full_name, chat_id, this](){
+            std::cout << "Running " << task_full_name << std::endl;
+            sendMessage(chat_id, "task_full_name");
+        },
+
+        .chat_id = chat_id,
+    };
+    m_periodic_pool.addTask(std::move(task));
 }

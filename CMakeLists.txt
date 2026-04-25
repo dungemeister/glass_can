@@ -15,6 +15,7 @@ set(SOURCES main.cpp
             src/bot_context.cpp
             src/db.cpp
             src/worker_pool.cpp
+            src/periodic_pool.cpp
             )
 
 set(INCLUDES third_party

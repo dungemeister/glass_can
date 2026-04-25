@@ -10,6 +10,7 @@
 #include "user_context.h"
 #include "worker_pool.h"
 #include "bot_config.h"
+#include "periodic_pool.h"
 
 #include "nlohmann/json.hpp"
 #include <tuple>
@@ -129,7 +130,9 @@ private:
     BotContext m_context;
     BotConfig m_config;
     WorkerPool m_workers_pool;
-    
+    PeriodicTasks::PeriodicPool m_periodic_pool;
+
+
     std::unordered_map<TgAPIRequest, std::tuple<std::string, RequestType>>  m_requests_table;
     std::unordered_map<uint64_t, UserContext::ItemBuyInfo>                  m_user_buy_item_info;
     std::unordered_map<std::string, BotContext::BotCommand>                 m_commands_map;
@@ -161,5 +164,7 @@ private:
     void sendWatchListDeleteMenu(int chat_id);
     void getWatchListItemsData(int chat_id);
     void sendWatchListAddLinkMessage(int chat_id, int message_id);
-    void getWatchListItemsList(int chat_id);    
+    void getWatchListItemsList(int chat_id);
+
+    void addPeriodicTask(int chat_id, const std::string& taskname);
 };
