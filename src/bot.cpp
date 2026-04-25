@@ -665,7 +665,7 @@ json TgBot::steamWatchListMenu(){
 
                 { {{ "text", "📈Актуальные цены"},                  {"callback_data", c_steam_info_watch_list_string}},
                   {{ "text", "➖Удалить из списка"},                {"callback_data", c_steam_delete_watch_list_string}}},
-                { {{"text", "🔄В главное меню"},                    {"callback_data", c_main_menu_string}} }
+                { {{"text", "🔄В главное меню"},                    {"callback_data", c_steam_menu_string}} }
             }}
         };
 }
@@ -679,7 +679,7 @@ json TgBot::steamPurchaseListMenu(){
                  {{ "text", "➖Удалить данные по закупке"},         {"callback_data", c_steam_delete_purchased_item_string}}},
 
                 { {{ "text", "📈Данные по закупке"},                {"callback_data", c_steam_list_purchased_items_string}}},
-                { {{"text", "🔄В главное меню"},                    {"callback_data", c_main_menu_string}} }
+                { {{"text", "🔄В главное меню"},                    {"callback_data", c_steam_menu_string}} }
             }}
         };
 }
