@@ -817,10 +817,10 @@ void TgBot::handleCallbackQuery(const json& callback){
             }
             //Send list of items from user's purchased list
             else if(data.get<std::string>() == c_steam_list_purchased_items_string){
-                getPurchasedItemsData(chat_id, res["error_msg"].get<std::string>());
+                getPurchasedItemsData(chat_id);
             }
             else if(data.get<std::string>() == c_steam_purchased_item_info_string){
-                getPurchasedItemsList(chat_id, res["error_msg"].get<std::string>());
+                getPurchasedItemsList(chat_id);
             }
             else if(data.get<std::string>() == c_steam_delete_purchased_item_string){
                 deletePurchasedItem(chat_id);
@@ -1087,7 +1087,7 @@ void TgBot::deletePurchasedItem(int chat_id){
     m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_DELETE_LINK);
 }
 
-void TgBot::getPurchasedItemsList(int chat_id, const std::string& error_msg){
+void TgBot::getPurchasedItemsList(int chat_id){
     std::cout << "Requested purchased items info" << std::endl;
     auto db_res = m_sqlite_db->getUserItemsBuyInfo(chat_id);
     auto& links = db_res["data"];
@@ -1107,12 +1107,12 @@ void TgBot::getPurchasedItemsList(int chat_id, const std::string& error_msg){
         sendMessage(chat_id, "*Список покупок*", steamPurchaseListMenu(), ParseMode::eMARKDOWN_V2);
     }
     else {
-        sendMessage(chat_id, "Ошибка: " + error_msg, steamPurchaseListMenu());
+        sendMessage(chat_id, "Ошибка: " + db_res["error_msg"].get<std::string>(), steamPurchaseListMenu());
     }
     m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
 }
 
-void TgBot::getPurchasedItemsData(int chat_id, const std::string& error_msg){
+void TgBot::getPurchasedItemsData(int chat_id){
     auto db_res = m_sqlite_db->getUserItemsBuyInfo(chat_id);
     auto& links = db_res["data"];
     
@@ -1136,7 +1136,7 @@ void TgBot::getPurchasedItemsData(int chat_id, const std::string& error_msg){
         sendMessage(chat_id, "*Список покупок*", steamPurchaseListMenu(), ParseMode::eMARKDOWN_V2);
     }
     else{
-        sendMessage(chat_id, "Ошибка: " + error_msg, steamPurchaseListMenu());
+        sendMessage(chat_id, "Ошибка: " + db_res["error_msg"].get<std::string>(), steamPurchaseListMenu());
     }
     m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
 }

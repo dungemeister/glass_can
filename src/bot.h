@@ -165,8 +165,8 @@ private:
     const PriceOverview::SteamCurrency c_steam_currency = PriceOverview::SteamCurrency::eUSD; //Current steam currency
     //PurchasedList
     void deletePurchasedItem(int chat_id);
-    void getPurchasedItemsList(int chat_id, const std::string& error_msg);
-    void getPurchasedItemsData(int chat_id, const std::string& error_msg);
+    void getPurchasedItemsList(int chat_id);
+    void getPurchasedItemsData(int chat_id);
     void sendPurchasedItemsMenu(int chat_id);
     //WatchList
     void sendWatchListDeleteMenu(int chat_id);
