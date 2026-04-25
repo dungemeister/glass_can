@@ -35,7 +35,12 @@ namespace PeriodicTasks{
 
     };
 
-    using Compare = std::greater<std::shared_ptr<PeriodicTaskDescriptor>>;
+    struct CompareNextRun {
+        bool operator()(const std::shared_ptr<PeriodicTaskDescriptor>& a,
+                        const std::shared_ptr<PeriodicTaskDescriptor>& b) const {
+            return a->next_run > b->next_run;
+        }
+    };
 
     class PeriodicPool{
     public:
@@ -49,13 +54,17 @@ namespace PeriodicTasks{
 
         void runPool();
         void stopPool();
+
+        size_t getTaskSize() { return m_tasks.size(); }
+        bool   emptyTasks()  { return m_tasks.empty(); }
+
     private:
         std::thread m_worker;
         std::atomic<bool> m_stop;
         uint64_t m_next_task_id;
 
         std::unordered_map<uint64_t, std::shared_ptr<PeriodicTaskDescriptor>>m_tasks;
-        std::priority_queue<std::shared_ptr<PeriodicTaskDescriptor>, std::vector<std::shared_ptr<PeriodicTaskDescriptor>>, Compare> m_heap;
+        std::priority_queue<std::shared_ptr<PeriodicTaskDescriptor>, std::vector<std::shared_ptr<PeriodicTaskDescriptor>>, CompareNextRun> m_heap;
         std::mutex m_mutex;
         std::condition_variable m_cv;
     };

@@ -1220,12 +1220,11 @@ void TgBot::getWatchListItemsList(int chat_id){
 
 void TgBot::addPeriodicTask(int chat_id, const std::string& taskname){
     std::stringstream task_ss;
-    task_ss << "Task " << chat_id << ": " << taskname;
+    task_ss << "Task " << chat_id << ": " << taskname << " " << m_periodic_pool.getTaskSize();
     auto task_full_name = task_ss.str();
 
     uint64_t task_period_ms = 2000;
     PeriodicTasks::PeriodicTaskDescriptor task{
-        .id = 0,
         .name = task_full_name,
         .period = task_period_ms,
         .next_run = PeriodicTasks::Clock::now(),
