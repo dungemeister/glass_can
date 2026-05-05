@@ -106,7 +106,7 @@ private:
     json steamWatchListAddLinkMenu();
     json steamSurveyListMenu();
     
-    nlohmann::json createInlineKeyboard(const std::vector<std::string>& buttons, const std::string& callback_prefix, int rows);
+    nlohmann::json createInlineKeyboard(const std::vector<std::pair<std::string, std::string>>& buttons, const std::string& callback_prefix, int rows);
 
     void handleCallbackQuery(const json& callback);
     
@@ -174,6 +174,8 @@ private:
     void sendWatchListAddLinkMessage(int chat_id, int message_id);
     void getWatchListItemsList(int chat_id);
     //SurveyList
-    void addPeriodicTask(int chat_id, const std::string& taskname);
+    void sendSurveyListAddMenu(int chat_id, int message_id);
+    void addPeriodicTask(int chat_id, const std::string& taskname, int period_ms, std::function<void()> action);
     void deletePeriodicTask(int chat_id, uint64_t id);
+    void sendSurveyListAddLinkPeriodMenu(int chat_id, const std::string& title, int message_id);
 };
