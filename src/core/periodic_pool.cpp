@@ -55,7 +55,14 @@ void PeriodicTasks::PeriodicPool::runPool(){
 
         lock.unlock();
         for(auto t: ready){
-            t->action();
+            try{
+
+                t->action();
+            }
+            catch(std::exception& e){
+                std::cout << "ERROR (" << t->name << "): " << e.what() << std::endl;
+                t->stopped = true;
+            }
         }
 
     }

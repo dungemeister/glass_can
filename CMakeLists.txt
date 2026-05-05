@@ -12,14 +12,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(SOURCES main.cpp
             src/bot.cpp
-            src/bot_context.cpp
-            src/db.cpp
-            src/worker_pool.cpp
-            src/periodic_pool.cpp
+            src/db/db.cpp
+            src/core/bot_context.cpp
+            src/core/worker_pool.cpp
+            src/core/periodic_pool.cpp
             )
 
 set(INCLUDES third_party
              src
+             src/core
+             src/core/tools
+             src/db
+             src/domain
              )
 
 add_library(curlpp SHARED IMPORTED)

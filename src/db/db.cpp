@@ -50,6 +50,15 @@ void DataBase::initSchema(){
                 date TEXT -- YYYY-MM-DD
             );
 
+            CREATE TABLE IF NOT EXISTS user_survey_tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER REFERENCES users(id),
+                url TEXT NOT NULL,
+                title TEXT,
+                period INTEGER NOT NULL,
+                date TEXT -- YYYY-MM-DD
+            );
+
         )");
     }
     catch(const std::exception& e){
@@ -134,6 +143,7 @@ nlohmann::json DataBase::getUserLinkByTitle(uint64_t chat_id, const std::string&
     std::stringstream q;
     q << "SELECT * FROM user_links WHERE user_id = " << user_id << " AND title = '" << title << "';";
     auto stats = query(q.str());
+    if(stats.empty()) return {};
     return stats[0];
 }
 
@@ -240,7 +250,7 @@ nlohmann::json DataBase::setUserCurrency(uint64_t chat_id, const std::string& cu
     nlohmann::json result;
     try{
         std::stringstream q;
-        q << "UPDATE users\n" <<
+        q << "INSERT INTO users\n" <<
              "SET currency = '" << currency <<"'\n" <<
              "WHERE chat_id = " << chat_id << ";";
         exec(q.str());
@@ -255,4 +265,52 @@ nlohmann::json DataBase::setUserCurrency(uint64_t chat_id, const std::string& cu
         result["ok"] = false;
     }
     return result;
+}
+
+nlohmann::json DataBase::addUserSurveyLink(uint64_t chat_id, const std::string& title, const std::string link, int period){
+    nlohmann::json result;
+
+    try{
+        std::stringstream q;
+        q << "INSERT INTO user_survey_tasks (user_id, url, title, period, date) " <<
+             "VALUES (" << chat_id << "," <<
+                           "'" << StringMisc::sqlQuoteShielding(StringMisc::removeQuotes(link)) << "', " <<
+                           "'" << StringMisc::sqlQuoteShielding(StringMisc::removeQuotes(title)) << "', " <<
+                           period << ", " <<
+                           "'2026-03-03' " << ");";
+        std::cout << q.str();
+        exec(q.str());
+        result["data"] = nlohmann::json::array();
+        result["error_msg"] = "";
+        result["ok"] = true;
+    }
+    catch(const std::exception& e){
+        result["data"] = nlohmann::json::array();
+        result["error_msg"] = std::string(e.what());
+        result["ok"] = false;
+    }
+    return result;
+}
+
+std::vector<SurveyLink> DataBase::getUserSurveyLinks(uint64_t chat_id, DataBasePagination& pag){
+    nlohmann::json result;
+
+    try{
+        std::stringstream q;
+        q << "SELECT * FROM user_survey_list " <<
+             "WHERE user_id=" << chat_id << ";";
+        std::cout << q.str();
+        auto rows = query(q.str());
+        std::cout << rows << std::endl;
+
+        result["data"] = nlohmann::json::array();
+        result["error_msg"] = "";
+        result["ok"] = true;
+    }
+    catch(const std::exception& e){
+        result["data"] = nlohmann::json::array();
+        result["error_msg"] = std::string(e.what());
+        result["ok"] = false;
+    }
+    return {};
 }
