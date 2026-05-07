@@ -292,18 +292,19 @@ nlohmann::json DataBase::addUserSurveyLink(uint64_t chat_id, const std::string& 
     return result;
 }
 
-std::vector<SurveyLink> DataBase::getUserSurveyLinks(uint64_t chat_id, DataBasePagination& pag){
+nlohmann::json DataBase::getUserSurveyLinks(uint64_t chat_id, const DataBasePagination& pag){
     nlohmann::json result;
 
     try{
         std::stringstream q;
-        q << "SELECT * FROM user_survey_list " <<
-             "WHERE user_id=" << chat_id << ";";
-        std::cout << q.str();
+        q << "SELECT * FROM user_survey_tasks " <<
+             "WHERE user_id=" << chat_id << " " <<
+             "LIMIT " << pag.limit << " " <<
+             "OFFSET " << pag.offset << ";";
+        std::cout << q.str() << std::endl;
         auto rows = query(q.str());
-        std::cout << rows << std::endl;
 
-        result["data"] = nlohmann::json::array();
+        result["data"] = rows;
         result["error_msg"] = "";
         result["ok"] = true;
     }
@@ -312,5 +313,5 @@ std::vector<SurveyLink> DataBase::getUserSurveyLinks(uint64_t chat_id, DataBaseP
         result["error_msg"] = std::string(e.what());
         result["ok"] = false;
     }
-    return {};
+    return result;
 }

@@ -178,4 +178,5 @@ private:
     void addPeriodicTask(int chat_id, const std::string& taskname, int period_ms, std::function<void()> action);
     void deletePeriodicTask(int chat_id, uint64_t id);
     void sendSurveyListAddLinkPeriodMenu(int chat_id, const std::string& title, int message_id);
+    void getSurveyListUserLinks(int chat_id, int message_id);
 };

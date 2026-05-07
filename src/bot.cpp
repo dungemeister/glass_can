@@ -832,6 +832,9 @@ void TgBot::handleCallbackQuery(const json& callback){
             else if(data.get<std::string>() == c_steam_survey_list_delete_string){
                 deletePeriodicTask(chat_id, 0);
             }
+            else if(data.get<std::string>() == c_steam_survey_list_list_string){
+                getSurveyListUserLinks(chat_id, -1);
+            }
         }
         //Send menu to delete user's item from purchased list
         if(user_bot_state == BotContext::BotContext::STEAM_WATCH_LIST_DELETE_LINK){
@@ -1347,4 +1350,32 @@ void TgBot::sendSurveyListAddLinkPeriodMenu(int chat_id, const std::string& titl
         editMessageText(chat_id, message_id, "Выбери период опроса", keyboard);
     }
     m_context.switchState(chat_id, BotContext::BotState::STEAM_SURVEY_LIST_SET_LINK_PERIOD);
+}
+
+void TgBot::getSurveyListUserLinks(int chat_id, int message_id=-1){
+    DataBasePagination pag = {
+        .offset = 0,
+        .limit = 1,
+    };
+    auto res = m_sqlite_db->getUserSurveyLinks(chat_id, pag);
+    std::stringstream out;
+    if(res["ok"]){
+        auto& links = res["data"];
+        size_t row_index = 0;
+        std::cout << links << std::endl;
+        for(auto& link: links){
+            out << ++row_index << ". " << link["title"] << " " << link["period"] << "\n";
+        }
+        sendMessage(chat_id, "Список ссылок для опроса:\n" + StringMisc::removeQuotes(out.str()), {});
+        if (message_id <= 0){
+            sendMessage(chat_id, "Меню списка опроса", steamSurveyListMenu());
+        }
+        else{
+            editMessageText(chat_id, message_id, "Меню списка опроса", steamSurveyListMenu());
+        }
+    }
+    else{
+        sendMessage(chat_id, "Ошибка получения списка " + res["error_msg"].get<std::string>(), steamSurveyListMenu());
+    }
+    m_context.switchState(chat_id, BotContext::BotState::STEAM_SURVEY_LIST_MENU);
 }

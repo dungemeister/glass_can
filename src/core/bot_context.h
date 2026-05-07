@@ -33,6 +33,7 @@ public:
         STEAM_SURVEY_LIST_ADD_LINK,
         STEAM_SURVEY_LIST_SET_LINK_PERIOD,
         STEAM_SURVEY_LIST_DELETE_LINK,
+        STEAM_SURVEY_LIST_GET_LINKS,
 
         //Separate Bot Commands
         SET_USER_CURRENCY,

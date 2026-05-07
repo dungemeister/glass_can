@@ -33,7 +33,7 @@ public:
     nlohmann::json getUserItemsBuyInfo(uint64_t chat_id);
     //Survey list functions
     nlohmann::json addUserSurveyLink(uint64_t chat_id, const std::string& title, const std::string link, int period);
-    std::vector<SurveyLink> getUserSurveyLinks(uint64_t chat_id, DataBasePagination& pag);
+    nlohmann::json getUserSurveyLinks(uint64_t chat_id, const DataBasePagination& pag);
     //Other functions
     nlohmann::json setUserCurrency(uint64_t chat_id, const std::string& currency);
 private:
