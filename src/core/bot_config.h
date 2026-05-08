@@ -16,10 +16,11 @@ struct BotConfig{
         parse_config_file();
 
     }
-    std::string getBotToken()         const { return m_bot_token; }
-    std::string getSteamSessionID()   const { return m_steam_session_id; }
-    std::string getSteamLoginSecure() const { return m_steam_login_secure; }
-    size_t      getBotWorkers()       const { return m_config_json["bot"]["workers"].get<size_t>(); }
+    std::string getBotToken()           const { return m_bot_token; }
+    std::string getSteamSessionID()     const { return m_steam_session_id; }
+    std::string getSteamLoginSecure()   const { return m_steam_login_secure; }
+    size_t      getBotWorkers()         const { return m_config_json["bot"]["workers"].get<size_t>(); }
+    size_t      getBotLaunchWorkers()   const { return m_config_json["bot"]["launch_workers"].get<size_t>(); }
     
 private:
     void parse_config_file(){

@@ -22,6 +22,7 @@ public:
 
     int64_t addUser(int64_t chat_id, const std::string& username, const std::string& first_name);
     int64_t getUserId(int64_t chat_id);
+    nlohmann::json getUsers(const DataBasePagination& pag);
     //Watch list functions
     std::vector<nlohmann::json> getUserLinks(uint64_t chat_id);
     nlohmann::json getUserLinkByTitle(uint64_t chat_id, const std::string& title);
@@ -34,6 +35,7 @@ public:
     //Survey list functions
     nlohmann::json addUserSurveyLink(uint64_t chat_id, const std::string& title, const std::string link, int period);
     nlohmann::json getUserSurveyLinks(uint64_t chat_id, const DataBasePagination& pag);
+    nlohmann::json deleteSurveyLink(uint64_t chat_id, const std::string& title);
     //Other functions
     nlohmann::json setUserCurrency(uint64_t chat_id, const std::string& currency);
 private:

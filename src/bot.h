@@ -53,6 +53,8 @@ public:
     :m_authorized(false)
     ,m_config(config_file)
     ,m_workers_pool(m_config.getBotWorkers())
+    ,m_launch_background_pool(m_config.getBotLaunchWorkers())
+
     {
         initRequestsTable();
         initCommandList();
@@ -115,13 +117,14 @@ private:
     bool addSteamLink(uint64_t chat_id, const std::string& line);
     bool deleteSteamLink(uint64_t, const std::string& title);
 
-    json getUserLinkPriceOverview(const json& link);
+    json getUserLinkPriceOverview(const std::string& link_url);
     std::string convertUserLinkMinimal(const json& link);
 
     std::string getUserItemChart(const json& link);
     std::string getUserItemPriceAnalysys(const json& link, const json& price);
-
+    //Launch functions
     void updateBotCommands(const json& commands);
+    void uploadSurveyTasks();
 private:
     std::string m_token;
     std::string m_name;
@@ -132,7 +135,7 @@ private:
     BotConfig m_config;
     WorkerPool m_workers_pool;
     PeriodicTasks::PeriodicPool m_periodic_pool;
-
+    WorkerPool m_launch_background_pool;
 
     std::unordered_map<TgAPIRequest, std::tuple<std::string, RequestType>>  m_requests_table;
     std::unordered_map<uint64_t, UserContext::ItemBuyInfo>                  m_user_buy_item_info;
@@ -175,8 +178,11 @@ private:
     void getWatchListItemsList(int chat_id);
     //SurveyList
     void sendSurveyListAddMenu(int chat_id, int message_id);
-    void addPeriodicTask(int chat_id, const std::string& taskname, int period_ms, std::function<void()> action);
-    void deletePeriodicTask(int chat_id, uint64_t id);
     void sendSurveyListAddLinkPeriodMenu(int chat_id, const std::string& title, int message_id);
+    void sendSurveyListDeleteMenu(int chat_id);
+    void addPeriodicTask(PeriodicTasks::PeriodicTaskDescriptor&& task);
+    void deletePeriodicTask(int chat_id, uint64_t id);
     void getSurveyListUserLinks(int chat_id, int message_id);
+    //Tools
+    PeriodicTasks::PeriodicTaskDescriptor createSurveyTask(const SurveyLink& link);
 };

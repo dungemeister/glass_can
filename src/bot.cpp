@@ -390,9 +390,12 @@ void TgBot::loop(){
     
     auto commands = getMyCommands();
     updateBotCommands(commands);
+    WorkerPool::Task upload_task = [&,this](){
+        this->uploadSurveyTasks();
+    };
+    m_workers_pool.enqueue(upload_task);
 
     auto gifts = getAvailableGifts().dump();
-
     uint64_t offset = 0;
     while(true){
         auto updates = getUpdates(offset);
@@ -830,7 +833,8 @@ void TgBot::handleCallbackQuery(const json& callback){
                 // addPeriodicTask(chat_id, "survey_steam_task");
             }
             else if(data.get<std::string>() == c_steam_survey_list_delete_string){
-                deletePeriodicTask(chat_id, 0);
+                // deletePeriodicTask(chat_id, 0);
+                sendSurveyListDeleteMenu(chat_id);
             }
             else if(data.get<std::string>() == c_steam_survey_list_list_string){
                 getSurveyListUserLinks(chat_id, -1);
@@ -904,29 +908,51 @@ void TgBot::handleCallbackQuery(const json& callback){
         else if(user_bot_state == BotContext::BotContext::STEAM_SURVEY_LIST_SET_LINK_PERIOD){
             std::string data = callback["data"];
             std::cout << data << std::endl;
-            auto payload = StringMisc::splitByDelim(data, ' ');
-            std::string& title = payload[0];
+            auto payload = StringMisc::splitOnceByDelim(data, ' ', StringMisc::SplitOnce::FROM_END);
+            
+            std::string title;
+            for(auto it = payload.begin(); it != payload.end() - 1; ++it){
+                title += *it;
+            }
             int period_min = 0;
             if(payload.size() > 1)
-                period_min = std::atoi(payload[1].c_str());
+                period_min = std::atoi(payload[payload.size() - 1].c_str());
             else
                 throw std::runtime_error("Fail to parse callback data " + data);
             auto link = m_sqlite_db->getUserLinkByTitle(chat_id, title);
 
             auto res = m_sqlite_db->addUserSurveyLink(chat_id, title, link["url"], period_min);
             if(res["ok"]){
+                std::cout << link << std::endl;
+                SurveyLink survey_link( link["url"].get<std::string>(),
+                                        link["title"].get<std::string>(),
+                                        period_min,
+                                        chat_id);
+
+                auto task = createSurveyTask(survey_link);
+                addPeriodicTask(std::move(task));
+
                 editMessageText(chat_id, message_id, "Ссылка добавлена в список опроса", steamSurveyListMenu());
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_SURVEY_LIST_MENU);
-                addPeriodicTask(chat_id, link["title"], period_min * 60 * 1000, [&,this, link, chat_id](){
-                    auto res = this->getUserLinkPriceOverview(link);
-                    sendMessage(chat_id, StringMisc::escapeString(res), {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");
-                });
             }
             else{
                 std::string error_msg = StringMisc::escapeString(res["error_msg"].get<std::string>(), "_~>#+-=|{}.!()");
                 nlohmann::json keyboard;
                 keyboard["inline_keyboard"].push_back({ {{ "text", "❌В меню"},                 {"callback_data", c_steam_survey_list_menu_string}} });
                 editMessageText(chat_id, message_id, "Ошибка добавления в список опроса " + error_msg, keyboard);
+            }
+        }
+        else if(user_bot_state == BotContext::BotContext::STEAM_SURVEY_LIST_DELETE_LINK){
+            std::string data = callback["data"];
+            std::cout << data << std::endl;
+            auto res = m_sqlite_db->deleteSurveyLink(chat_id, data);
+            if(res["ok"]){
+                sendMessage(chat_id, "Успешно удалено " + data, steamSurveyListMenu());
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
+            }
+            else{
+                sendMessage(chat_id, "ERROR: " + res["error_msg"].get<std::string>(), steamSurveyListMenu());
+                m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
             }
         }
     }
@@ -950,8 +976,8 @@ bool TgBot::deleteSteamLink(uint64_t chat_id, const std::string& title){
     return m_sqlite_db->deleteUserLink(chat_id, title);
 }
 
-json TgBot::getUserLinkPriceOverview(const json& link){
-    auto url = link["url"].get<std::string>();
+json TgBot::getUserLinkPriceOverview(const std::string& link_url){
+    auto url = link_url;
     auto index = url.rfind("/");
     const std::string item_hash_name =  url.substr(index + 1);
     auto res = PriceOverview::Parser::getSteamItemPrice(c_steam_app_id, item_hash_name, c_steam_currency);
@@ -1166,7 +1192,7 @@ void TgBot::getPurchasedItemsData(int chat_id){
         }
         for(auto& link: links){
             std::cout << "\t" << link["url"] << ": " << link["title"] << std::endl;
-            auto price_res = getUserLinkPriceOverview(link);
+            auto price_res = getUserLinkPriceOverview(link["url"].get<std::string>());
             auto temp = price_res.dump();
             if(price_res["json"]["lowest_price"].is_null()){
 
@@ -1229,7 +1255,7 @@ void TgBot::getWatchListItemsData(int chat_id){
     if(links.size() > 0){
         for(const auto& link: links){
             auto markdown_link = StringMisc::createMarkdownLink(link["url"], StringMisc::escapeString(StringMisc::uriToString(link["title"])));
-            auto result = getUserLinkPriceOverview(link);
+            auto result = getUserLinkPriceOverview(link["url"].get<std::string>());
             auto item_name = StringMisc::escapeString(result["caption"].get<std::string>(), "-(){}|.,=");
             try {
                 auto png_path = getUserItemChart(link);
@@ -1292,21 +1318,8 @@ void TgBot::getWatchListItemsList(int chat_id){
     sendMessage(chat_id, out.str() + "*Steam Menu*", steamWatchListMenu(), ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW);
 }
 
-void TgBot::addPeriodicTask(int chat_id, const std::string& taskname, int period_ms, std::function<void()> action){
-    std::stringstream task_ss;
-    task_ss << "Task " << chat_id << ": " << taskname << " " << m_periodic_pool.getTaskSize();
-    auto task_full_name = task_ss.str();
-
-    PeriodicTasks::PeriodicTaskDescriptor task{
-        .name = task_full_name,
-        .period = period_ms,
-        .next_run = PeriodicTasks::Clock::now(),
-        .paused = false,
-        .stopped = false,
-        .action = action,
-
-        .chat_id = chat_id,
-    };
+void TgBot::addPeriodicTask(PeriodicTasks::PeriodicTaskDescriptor&& task){
+    std::cout << "Added task " << task.name << std::endl;
     m_periodic_pool.addTask(std::move(task));
 }
 
@@ -1352,21 +1365,46 @@ void TgBot::sendSurveyListAddLinkPeriodMenu(int chat_id, const std::string& titl
     m_context.switchState(chat_id, BotContext::BotState::STEAM_SURVEY_LIST_SET_LINK_PERIOD);
 }
 
+void TgBot::sendSurveyListDeleteMenu(int chat_id){
+    // auto links = m_sqlite_db->getUserLinks(chat_id);
+    auto res = m_sqlite_db->getUserSurveyLinks(chat_id, (DataBasePagination){});
+    if(res["ok"]){
+        auto links = res["data"];
+        std::vector<std::pair<std::string, std::string>> buttons;
+        for(auto& link: links){
+            SurveyLink survey_link(link);
+            buttons.emplace_back(survey_link.title, "");
+        }
+        auto keyboard = createInlineKeyboard(buttons, "", 2);
+        keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_survey_list_menu_string}} });
+        sendMessage(chat_id, "Выбери позицию для удаления", keyboard);
+        m_context.switchState(chat_id, BotContext::BotState::STEAM_SURVEY_LIST_DELETE_LINK);
+    }
+    else {
+        sendMessage(chat_id, "Меню списка опроса", steamSurveyListMenu());
+        m_context.switchState(chat_id, BotContext::BotState::STEAM_SURVEY_LIST_MENU);
+    }
+}
+
 void TgBot::getSurveyListUserLinks(int chat_id, int message_id=-1){
     DataBasePagination pag = {
         .offset = 0,
-        .limit = 1,
+        .limit = 0,
     };
-    auto res = m_sqlite_db->getUserSurveyLinks(chat_id, pag);
     std::stringstream out;
+    auto res = m_sqlite_db->getUserSurveyLinks(chat_id, pag);
     if(res["ok"]){
         auto& links = res["data"];
         size_t row_index = 0;
         std::cout << links << std::endl;
         for(auto& link: links){
-            out << ++row_index << ". " << link["title"] << " " << link["period"] << "\n";
+            SurveyLink survey_link(link);
+            out << ++row_index << ". " <<
+                   StringMisc::createMarkdownLink(survey_link.url, survey_link.title) << " " <<
+                   std::to_string(survey_link.period) << "\n";
         }
-        sendMessage(chat_id, "Список ссылок для опроса:\n" + StringMisc::removeQuotes(out.str()), {});
+        sendMessage(chat_id, "Список ссылок для опроса:\n" + StringMisc::removeQuotes(out.str()), {},
+                    TgBot::ParseMode::eMARKDOWN_V2, TgBot::MessageWebPreview::eDISABLE_WEB_PREVIEW);
         if (message_id <= 0){
             sendMessage(chat_id, "Меню списка опроса", steamSurveyListMenu());
         }
@@ -1378,4 +1416,61 @@ void TgBot::getSurveyListUserLinks(int chat_id, int message_id=-1){
         sendMessage(chat_id, "Ошибка получения списка " + res["error_msg"].get<std::string>(), steamSurveyListMenu());
     }
     m_context.switchState(chat_id, BotContext::BotState::STEAM_SURVEY_LIST_MENU);
+}
+
+void TgBot::uploadSurveyTasks(){
+    DataBasePagination pag = {.offset = 0, .limit = 0,};
+    auto res = m_sqlite_db->getUsers(pag);
+    auto& users = res["data"];
+
+    if(res["ok"]){
+        for(auto& user: users){
+            auto username = user["username"].get<std::string>();
+            auto chat_id = static_cast<uint64_t>(std::atoi(user["chat_id"].get<std::string>().c_str()));
+            auto links_res = m_sqlite_db->getUserSurveyLinks(chat_id, (DataBasePagination){});
+            if(links_res["ok"]){
+                auto links = links_res["data"];
+                for(auto link: links){
+                    std::cout << link << std::endl;
+                    auto survey_link = SurveyLink(link);
+                    auto task = createSurveyTask(survey_link);
+                    addPeriodicTask(std::move(task));
+                }
+            }
+            else{
+                std::cout << "WARNING " << username << " " << chat_id << ":" <<
+                             links_res["error_msg"] << std::endl;
+            }
+        }
+
+    }
+    else{
+        std::cout << "WARNING: " << res["error_msg"].get<std::string>() << std::endl;
+    }
+
+}
+
+PeriodicTasks::PeriodicTaskDescriptor TgBot::createSurveyTask(const SurveyLink& link){
+    std::string task_name = std::to_string(link.chat_id) + " " + link.title;
+    std::function<void()> task_action = [link, this](){
+        auto res = this->getUserLinkPriceOverview(link.url);
+        if(res["ok"]){
+            std::stringstream out;
+            out << StringMisc::createMarkdownLink(link.url, link.title) << "\n";
+            auto data = res["data"].get<std::string>();
+            out << data;
+            sendMessage(link.chat_id, StringMisc::escapeString(out.str()), {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");
+        }
+    };
+    PeriodicTasks::PeriodicTaskDescriptor task = {
+        .id = m_periodic_pool.getTaskSize(),
+        .name = task_name,
+        .period = link.period * 60 * 1000,
+        .next_run = PeriodicTasks::Clock::now(),
+        .paused = false,
+        .stopped = false,
+        .action = task_action,
+        .chat_id = link.chat_id,
+    };
+    return std::move(task);
 }

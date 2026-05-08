@@ -107,6 +107,8 @@ int64_t DataBase::getUserId(int64_t chat_id){
 }
 
 std::vector<nlohmann::json> DataBase::query(const std::string& sql){
+    std::cout << sql << std::endl;
+
     std::vector<nlohmann::json> rows;
     char* err = nullptr;
 
@@ -298,9 +300,57 @@ nlohmann::json DataBase::getUserSurveyLinks(uint64_t chat_id, const DataBasePagi
     try{
         std::stringstream q;
         q << "SELECT * FROM user_survey_tasks " <<
-             "WHERE user_id=" << chat_id << " " <<
-             "LIMIT " << pag.limit << " " <<
-             "OFFSET " << pag.offset << ";";
+             "WHERE user_id=" << chat_id;
+        if(pag.limit != 0){
+            q << " LIMIT " << pag.limit << " " <<
+                 "OFFSET " << pag.offset;
+        }
+        q << ";";
+        std::cout << q.str() << std::endl;
+        auto rows = query(q.str());
+
+        result["data"] = rows;
+        result["error_msg"] = "";
+        result["ok"] = true;
+    }
+    catch(const std::exception& e){
+        result["data"] = nlohmann::json::array();
+        result["error_msg"] = std::string(e.what());
+        result["ok"] = false;
+    }
+    return result;
+}
+
+nlohmann::json DataBase::deleteSurveyLink(uint64_t chat_id, const std::string& title){
+    nlohmann::json result;
+    try{
+        std::stringstream q;
+        q << "DELETE FROM user_survey_tasks " <<
+             "WHERE title = '" << title << "';";
+        auto rows = query(q.str());
+        result["data"] = rows;
+        result["error_msg"] = "";
+        result["ok"] = true;
+    }
+    catch(std::exception& e){
+        result["data"] = nlohmann::json::array();
+        result["error_msg"] = std::string(e.what());
+        result["ok"] = false;
+    }
+    return result;
+}
+
+nlohmann::json DataBase::getUsers(const DataBasePagination& pag){
+    nlohmann::json result;
+
+    try{
+        std::stringstream q;
+        q << "SELECT * FROM users";
+        if(pag.limit != 0){
+            q << " LIMIT " << pag.limit << " " <<
+                 "OFFSET " << pag.offset;
+        }
+        q << ";";
         std::cout << q.str() << std::endl;
         auto rows = query(q.str());
 

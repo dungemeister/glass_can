@@ -5,6 +5,11 @@
 
 namespace StringMisc{
 
+    enum SplitOnce{
+        FROM_START,
+        FROM_END,
+    };
+
     using json = nlohmann::json;
     static std::string escapeString(const std::string& input, const std::string& chars="_~>#+-=|{}.!") {
         std::string result;
@@ -151,6 +156,20 @@ namespace StringMisc{
             tokens.push_back(std::move(token));
         }
 
+        return tokens;
+    }
+
+    static std::vector<std::string> splitOnceByDelim(const std::string& input, char delim, SplitOnce start=SplitOnce::FROM_START){
+        std::vector<std::string> tokens;
+        size_t pos;
+        if(start == SplitOnce::FROM_START) pos = input.find(delim);
+        if(start == SplitOnce::FROM_END) pos = input.rfind(delim);
+        else return {};
+        
+        if(pos == std::string::npos) return {};
+
+        tokens.push_back(input.substr(0, pos));
+        tokens.push_back(input.substr(pos+1));
         return tokens;
     }
 }
