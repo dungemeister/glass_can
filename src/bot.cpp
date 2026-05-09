@@ -947,7 +947,7 @@ void TgBot::handleCallbackQuery(const json& callback){
             std::cout << data << std::endl;
             auto res = m_sqlite_db->deleteSurveyLink(chat_id, data);
             if(res["ok"]){
-                sendMessage(chat_id, "Успешно удалено " + data, steamSurveyListMenu());
+                sendMessage(chat_id, "Успешно удалено " + StringMisc::escapeString(data, "_~>#+-=|{}.!()"), steamSurveyListMenu());
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
             }
             else{
