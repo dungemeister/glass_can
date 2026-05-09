@@ -41,7 +41,7 @@ private:
     std::string get_from_env(const char* key){
         auto value = std::getenv(key);
 
-        if(!value || !*value) throw std::runtime_error(std::string("Missing env key ") + key);
+        if(!value || !*value) throw std::runtime_error("Missing env key " + std::string(key));
 
         return value;
     }
