@@ -30,8 +30,9 @@ void PeriodicTasks::PeriodicPool::runPool(){
 
         auto closest_task = m_heap.top();
         auto now = Clock::now();
+        auto heap_size = m_heap.size();
         if(closest_task->next_run > now){
-            m_cv.wait_until(lock, closest_task->next_run, [this]{ return m_stop.load(); });
+            m_cv.wait_until(lock, closest_task->next_run, [this, heap_size]{ return m_stop.load() | heap_size != m_heap.size(); });
             continue;
         }
 
