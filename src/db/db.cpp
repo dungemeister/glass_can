@@ -1,6 +1,7 @@
 #include "db.h"
 #include <iostream>
 #include <sstream>
+#include "survey_link.h"
 
 DataBase::DataBase(const std::string& file)
 :m_file(file)
@@ -56,7 +57,8 @@ void DataBase::initSchema(){
                 url TEXT NOT NULL,
                 title TEXT,
                 period INTEGER NOT NULL,
-                date TEXT -- YYYY-MM-DD
+                date TEXT -- YYYY-MM-DD,
+                task_id_hash BLOB NOT NULL DEFAULT X''
             );
 
         )");
@@ -68,6 +70,7 @@ void DataBase::initSchema(){
 
 void DataBase::exec(const std::string& sql){
     // (INSERT/UPDATE/DELETE)
+    std::cout << "EXEC: " << sql << std::endl;
     char* error = nullptr;
     if (sqlite3_exec(m_db, sql.c_str(), nullptr, nullptr, &error) != SQLITE_OK) {
         std::string err = error;
@@ -107,7 +110,7 @@ int64_t DataBase::getUserId(int64_t chat_id){
 }
 
 std::vector<nlohmann::json> DataBase::query(const std::string& sql){
-    std::cout << sql << std::endl;
+    std::cout << "QUERY: " << sql << std::endl;
 
     std::vector<nlohmann::json> rows;
     char* err = nullptr;
@@ -269,75 +272,110 @@ nlohmann::json DataBase::setUserCurrency(uint64_t chat_id, const std::string& cu
     return result;
 }
 
-nlohmann::json DataBase::addUserSurveyLink(uint64_t chat_id, const std::string& title, const std::string link, int period){
-    nlohmann::json result;
-
+int64_t DataBase::addUserSurveyLink(const SurveyLink& survey_link){
+    int64_t link_id = -1;
     try{
-        std::stringstream q;
-        q << "INSERT INTO user_survey_tasks (user_id, url, title, period, date) " <<
-             "VALUES (" << chat_id << "," <<
-                           "'" << StringMisc::sqlQuoteShielding(StringMisc::removeQuotes(link)) << "', " <<
-                           "'" << StringMisc::sqlQuoteShielding(StringMisc::removeQuotes(title)) << "', " <<
-                           period << ", " <<
-                           "'2026-03-03' " << ");";
-        std::cout << q.str();
-        exec(q.str());
-        result["data"] = nlohmann::json::array();
-        result["error_msg"] = "";
-        result["ok"] = true;
-    }
-    catch(const std::exception& e){
-        result["data"] = nlohmann::json::array();
-        result["error_msg"] = std::string(e.what());
-        result["ok"] = false;
-    }
-    return result;
-}
-
-nlohmann::json DataBase::getUserSurveyLinks(uint64_t chat_id, const DataBasePagination& pag){
-    nlohmann::json result;
-
-    try{
-        std::stringstream q;
-        q << "SELECT * FROM user_survey_tasks " <<
-             "WHERE user_id=" << chat_id;
-        if(pag.limit != 0){
-            q << " LIMIT " << pag.limit << " " <<
-                 "OFFSET " << pag.offset;
+        
+        std::string q = R"(
+        INSERT INTO user_survey_tasks (user_id, url, title, period, date, task_id_hash)
+        VALUES (?,?,?,?,?,?);
+        )";
+        sqlite3_stmt* stmt;
+        if(sqlite3_prepare_v2(m_db, q.c_str(), -1, &stmt, nullptr) != SQLITE_OK){
+            throw std::runtime_error("ERROR: SQLITE3 fail to prepare stmt");
         }
-        q << ";";
-        std::cout << q.str() << std::endl;
-        auto rows = query(q.str());
 
-        result["data"] = rows;
-        result["error_msg"] = "";
-        result["ok"] = true;
+        sqlite3_bind_int64(stmt, 1, static_cast<int64_t>(survey_link.chat_id));
+        sqlite3_bind_text (stmt, 2, survey_link.url.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text (stmt, 3, survey_link.title.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int  (stmt, 4, survey_link.period);
+        sqlite3_bind_text (stmt, 5, "2026-03-03", -1, SQLITE_STATIC);
+        sqlite3_bind_blob (stmt, 6, &survey_link.task_id_hash, sizeof(survey_link.task_id_hash), SQLITE_TRANSIENT);
+
+        if (auto code = sqlite3_step(stmt); code != SQLITE_DONE) {
+            // обработка ошибки
+            sqlite3_finalize(stmt);
+            throw std::runtime_error("ERROR: SQLITE3 fail " + std::string(sqlite3_errmsg(m_db)));
+        }
+        debugPrintQuery(stmt);
+
+        link_id = sqlite3_last_insert_rowid(m_db);
+        sqlite3_finalize(stmt);
     }
     catch(const std::exception& e){
-        result["data"] = nlohmann::json::array();
-        result["error_msg"] = std::string(e.what());
-        result["ok"] = false;
+        std::cerr << e.what() << std::endl;
     }
-    return result;
+    return link_id;
 }
 
-nlohmann::json DataBase::deleteSurveyLink(uint64_t chat_id, const std::string& title){
-    nlohmann::json result;
+std::vector<SurveyLink> DataBase::getUserSurveyLinks(uint64_t chat_id, const DataBasePagination& pag){
+    std::vector<SurveyLink> links;
     try{
-        std::stringstream q;
-        q << "DELETE FROM user_survey_tasks " <<
-             "WHERE title = '" << title << "';";
-        auto rows = query(q.str());
-        result["data"] = rows;
-        result["error_msg"] = "";
-        result["ok"] = true;
+        std::string q = R"(
+        SELECT * FROM user_survey_tasks
+        WHERE user_id = ? ORDER BY id;
+        )";
+
+        sqlite3_stmt* stmt;
+        if(sqlite3_prepare_v2(m_db, q.c_str(), -1, &stmt, nullptr) != SQLITE_OK){
+            throw std::runtime_error("ERROR: SQLITE3 fail " + std::string(sqlite3_errmsg(m_db)));
+        }
+        sqlite3_bind_int(stmt, 1, chat_id);
+        debugPrintQuery(stmt);
+
+        while(sqlite3_step(stmt) == SQLITE_ROW){
+            SurveyLink link;
+            link.chat_id = sqlite3_column_int(stmt, 1);
+            link.url    = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+            link.title  = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+            link.period = sqlite3_column_int(stmt, 4);
+            auto blob = sqlite3_column_blob(stmt, 6);
+            if(blob && sqlite3_column_bytes(stmt, 6) == sizeof(size_t)){
+                memcpy(&link.task_id_hash, blob, sizeof(link.task_id_hash));
+            }
+            links.emplace_back(std::move(link));
+        }
+
+        sqlite3_finalize(stmt);
+
+    }
+    catch(const std::exception& e){
+        std::cerr << e.what() << std::endl;
+    }
+    return links;
+}
+
+std::vector<size_t> DataBase::deleteSurveyLink(uint64_t chat_id, const std::string& title){
+    std::vector<size_t> hashes;
+    hashes.reserve(10);
+    try{
+        std::string q = R"(
+        DELETE FROM user_survey_tasks WHERE title = ? RETURNING task_id_hash;
+        )";
+
+        sqlite3_stmt* stmt;
+        if(sqlite3_prepare_v2(m_db, q.c_str(), -1, &stmt, nullptr) != SQLITE_OK){
+            throw std::runtime_error("ERROR: SQLITE3 fail " + std::string(sqlite3_errmsg(m_db)));
+        }
+        sqlite3_bind_text(stmt, 1, title.c_str(), -1, SQLITE_TRANSIENT);
+        debugPrintQuery(stmt);
+
+        while(sqlite3_step(stmt) == SQLITE_ROW){
+            size_t hash;
+            auto blob = sqlite3_column_blob(stmt, 0);
+            if(blob && sqlite3_column_bytes(stmt, 0) == sizeof(hash)){
+                memcpy(&hash, blob, sizeof(hash));
+            }
+            hashes.push_back(hash);
+            std::cout << "Deleted task with id " << hash << std::endl;
+        }
+        sqlite3_finalize(stmt);
+
     }
     catch(std::exception& e){
-        result["data"] = nlohmann::json::array();
-        result["error_msg"] = std::string(e.what());
-        result["ok"] = false;
+        std::cerr << e.what() << std::endl;
     }
-    return result;
+    return hashes;
 }
 
 nlohmann::json DataBase::getUsers(const DataBasePagination& pag){
@@ -351,7 +389,6 @@ nlohmann::json DataBase::getUsers(const DataBasePagination& pag){
                  "OFFSET " << pag.offset;
         }
         q << ";";
-        std::cout << q.str() << std::endl;
         auto rows = query(q.str());
 
         result["data"] = rows;
@@ -364,4 +401,14 @@ nlohmann::json DataBase::getUsers(const DataBasePagination& pag){
         result["ok"] = false;
     }
     return result;
+}
+
+void DataBase::debugPrintQuery(sqlite3_stmt* stmt) {
+    #ifdef DATABASE_DEBUG
+        char* expanded_sql = sqlite3_expanded_sql(stmt);
+        if (expanded_sql) {
+            std::cout << "Expanded SQL: " << expanded_sql << std::endl;
+            sqlite3_free(expanded_sql);
+        }
+    #endif
 }

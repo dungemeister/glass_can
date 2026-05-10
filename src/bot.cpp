@@ -833,7 +833,6 @@ void TgBot::handleCallbackQuery(const json& callback){
                 // addPeriodicTask(chat_id, "survey_steam_task");
             }
             else if(data.get<std::string>() == c_steam_survey_list_delete_string){
-                // deletePeriodicTask(chat_id, 0);
                 sendSurveyListDeleteMenu(chat_id);
             }
             else if(data.get<std::string>() == c_steam_survey_list_list_string){
@@ -920,14 +919,14 @@ void TgBot::handleCallbackQuery(const json& callback){
             else
                 throw std::runtime_error("Fail to parse callback data " + data);
             auto link = m_sqlite_db->getUserLinkByTitle(chat_id, title);
+            SurveyLink survey_link( link["url"].get<std::string>(),
+                                    link["title"].get<std::string>(),
+                                    period_min,
+                                    chat_id);
 
-            auto res = m_sqlite_db->addUserSurveyLink(chat_id, title, link["url"], period_min);
-            if(res["ok"]){
+            auto link_id = m_sqlite_db->addUserSurveyLink(survey_link);
+            if(link_id != -1){
                 std::cout << link << std::endl;
-                SurveyLink survey_link( link["url"].get<std::string>(),
-                                        link["title"].get<std::string>(),
-                                        period_min,
-                                        chat_id);
 
                 auto task = createSurveyTask(survey_link);
                 addPeriodicTask(std::move(task));
@@ -936,22 +935,27 @@ void TgBot::handleCallbackQuery(const json& callback){
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_SURVEY_LIST_MENU);
             }
             else{
-                std::string error_msg = StringMisc::escapeString(res["error_msg"].get<std::string>(), "_~>#+-=|{}.!()");
                 nlohmann::json keyboard;
                 keyboard["inline_keyboard"].push_back({ {{ "text", "❌В меню"},                 {"callback_data", c_steam_survey_list_menu_string}} });
-                editMessageText(chat_id, message_id, "Ошибка добавления в список опроса " + error_msg, keyboard);
+                editMessageText(chat_id, message_id, "Ошибка добавления в список опроса",
+                                keyboard, TgBot::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW,
+                                "_~>#+-=|{}.!()");
             }
         }
         else if(user_bot_state == BotContext::BotContext::STEAM_SURVEY_LIST_DELETE_LINK){
             std::string data = callback["data"];
             std::cout << data << std::endl;
-            auto res = m_sqlite_db->deleteSurveyLink(chat_id, data);
-            if(res["ok"]){
-                sendMessage(chat_id, "Успешно удалено " + StringMisc::escapeString(data, "_~>#+-=|{}.!()"), steamSurveyListMenu());
+            auto deleted_task_id_hash = m_sqlite_db->deleteSurveyLink(chat_id, data);
+            if(!deleted_task_id_hash.empty()){
+                // auto task_id_hash = std::atres["data"].get<std::string>());
+                for(auto& id: deleted_task_id_hash){
+                    deletePeriodicTask(chat_id, id);
+                }
+                sendMessage(chat_id, "Успешно удалено " + std::to_string(deleted_task_id_hash.size()) + " задач", steamSurveyListMenu());
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
             }
             else{
-                sendMessage(chat_id, "ERROR: " + res["error_msg"].get<std::string>(), steamSurveyListMenu());
+                sendMessage(chat_id, "Ошибка удаления " + data, steamSurveyListMenu());
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
             }
         }
@@ -1319,7 +1323,7 @@ void TgBot::getWatchListItemsList(int chat_id){
 }
 
 void TgBot::addPeriodicTask(PeriodicTasks::PeriodicTaskDescriptor&& task){
-    std::cout << "Added task " << task.name << std::endl;
+    std::cout << "Added task " << task.name << " with id hash: " << task.id << std::endl;
     m_periodic_pool.addTask(std::move(task));
 }
 
@@ -1367,13 +1371,11 @@ void TgBot::sendSurveyListAddLinkPeriodMenu(int chat_id, const std::string& titl
 
 void TgBot::sendSurveyListDeleteMenu(int chat_id){
     // auto links = m_sqlite_db->getUserLinks(chat_id);
-    auto res = m_sqlite_db->getUserSurveyLinks(chat_id, (DataBasePagination){});
-    if(res["ok"]){
-        auto links = res["data"];
+    auto links = m_sqlite_db->getUserSurveyLinks(chat_id, (DataBasePagination){});
+    if(!links.empty()){
         std::vector<std::pair<std::string, std::string>> buttons;
         for(auto& link: links){
-            SurveyLink survey_link(link);
-            buttons.emplace_back(survey_link.title, "");
+            buttons.emplace_back(link.title, "");
         }
         auto keyboard = createInlineKeyboard(buttons, "", 2);
         keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_survey_list_menu_string}} });
@@ -1392,16 +1394,13 @@ void TgBot::getSurveyListUserLinks(int chat_id, int message_id=-1){
         .limit = 0,
     };
     std::stringstream out;
-    auto res = m_sqlite_db->getUserSurveyLinks(chat_id, pag);
-    if(res["ok"]){
-        auto& links = res["data"];
+    auto links = m_sqlite_db->getUserSurveyLinks(chat_id, pag);
+    if(!links.empty()){
         size_t row_index = 0;
-        std::cout << links << std::endl;
         for(auto& link: links){
-            SurveyLink survey_link(link);
             out << ++row_index << ". " <<
-                   StringMisc::createMarkdownLink(survey_link.url, survey_link.title) << " " <<
-                   std::to_string(survey_link.period) << "\n";
+                   StringMisc::createMarkdownLink(link.url, link.title) << " " <<
+                   std::to_string(link.period) << "\n";
         }
         sendMessage(chat_id, "Список ссылок для опроса:\n" + StringMisc::removeQuotes(out.str()), {},
                     TgBot::ParseMode::eMARKDOWN_V2, TgBot::MessageWebPreview::eDISABLE_WEB_PREVIEW);
@@ -1413,7 +1412,7 @@ void TgBot::getSurveyListUserLinks(int chat_id, int message_id=-1){
         }
     }
     else{
-        sendMessage(chat_id, "Ошибка получения списка " + res["error_msg"].get<std::string>(), steamSurveyListMenu());
+        sendMessage(chat_id, "Ошибка получения списка", steamSurveyListMenu());
     }
     m_context.switchState(chat_id, BotContext::BotState::STEAM_SURVEY_LIST_MENU);
 }
@@ -1427,22 +1426,14 @@ void TgBot::uploadSurveyTasks(){
         for(auto& user: users){
             auto username = user["username"].get<std::string>();
             auto chat_id = static_cast<uint64_t>(std::atoi(user["chat_id"].get<std::string>().c_str()));
-            auto links_res = m_sqlite_db->getUserSurveyLinks(chat_id, (DataBasePagination){});
-            if(links_res["ok"]){
-                auto links = links_res["data"];
+            auto links = m_sqlite_db->getUserSurveyLinks(chat_id, (DataBasePagination){});
+            if(!links.empty()){
                 for(auto link: links){
-                    std::cout << link << std::endl;
-                    auto survey_link = SurveyLink(link);
-                    auto task = createSurveyTask(survey_link);
+                    auto task = createSurveyTask(link);
                     addPeriodicTask(std::move(task));
                 }
             }
-            else{
-                std::cout << "WARNING " << username << " " << chat_id << ":" <<
-                             links_res["error_msg"] << std::endl;
-            }
         }
-
     }
     else{
         std::cout << "WARNING: " << res["error_msg"].get<std::string>() << std::endl;
@@ -1463,7 +1454,7 @@ PeriodicTasks::PeriodicTaskDescriptor TgBot::createSurveyTask(const SurveyLink& 
         }
     };
     PeriodicTasks::PeriodicTaskDescriptor task = {
-        .id = m_periodic_pool.getTaskSize(),
+        .id = link.task_id_hash,
         .name = task_name,
         .period = link.period * 60 * 1000,
         .next_run = PeriodicTasks::Clock::now(),

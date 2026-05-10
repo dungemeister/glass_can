@@ -9,6 +9,8 @@
 #include "survey_link.h"
 #include "db_pagination.h"
 
+#define DATABASE_DEBUG
+
 class DataBase{
 public:
     
@@ -33,12 +35,14 @@ public:
     nlohmann::json deleteUserItemBuyInfo(uint64_t chat_id, const std::string& title, float buy_price, int amount);
     nlohmann::json getUserItemsBuyInfo(uint64_t chat_id);
     //Survey list functions
-    nlohmann::json addUserSurveyLink(uint64_t chat_id, const std::string& title, const std::string link, int period);
-    nlohmann::json getUserSurveyLinks(uint64_t chat_id, const DataBasePagination& pag);
-    nlohmann::json deleteSurveyLink(uint64_t chat_id, const std::string& title);
+    int64_t addUserSurveyLink(const SurveyLink& survey_link);
+    std::vector<SurveyLink>  getUserSurveyLinks(uint64_t chat_id, const DataBasePagination& pag);
+    std::vector<size_t>      deleteSurveyLink(uint64_t chat_id, const std::string& title);
     //Other functions
     nlohmann::json setUserCurrency(uint64_t chat_id, const std::string& currency);
 private:
     std::string m_file;
     sqlite3* m_db;
+
+    void debugPrintQuery(sqlite3_stmt* stmt);
 };

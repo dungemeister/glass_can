@@ -3,7 +3,6 @@
 
 PeriodicTasks::PeriodicPool::PeriodicPool()
 :m_stop(false)
-,m_next_task_id(0)
 
 {
     m_worker = std::thread(&PeriodicTasks::PeriodicPool::runPool, this);
@@ -78,17 +77,16 @@ void PeriodicTasks::PeriodicPool::stopPool(){
     m_cv.notify_one();
 }
 
-uint64_t PeriodicTasks::PeriodicPool::addTask(PeriodicTaskDescriptor&& task){
+PeriodicTasks::task_id_hash PeriodicTasks::PeriodicPool::addTask(PeriodicTaskDescriptor&& task){
     std::unique_lock lock(m_mutex);
-    uint64_t id = m_next_task_id++;
-    task.id = id;
+    task_id_hash id = task.id;
     m_tasks[id] = std::make_shared<PeriodicTaskDescriptor>(task);
     m_heap.push(m_tasks[id]);
     m_cv.notify_one();
     return id;
 }
 
-void PeriodicTasks::PeriodicPool::pauseTask(uint64_t id){
+void PeriodicTasks::PeriodicPool::pauseTask(task_id_hash id){
     std::unique_lock lock (m_mutex);
 
     auto it = m_tasks.find(id);
@@ -98,7 +96,7 @@ void PeriodicTasks::PeriodicPool::pauseTask(uint64_t id){
     m_cv.notify_one();
 }
 
-void PeriodicTasks::PeriodicPool::resumeTask(uint64_t id){
+void PeriodicTasks::PeriodicPool::resumeTask(task_id_hash id){
     std::unique_lock lock(m_mutex);
     auto it = m_tasks.find(id);
     if(it != m_tasks.end()){
@@ -107,11 +105,20 @@ void PeriodicTasks::PeriodicPool::resumeTask(uint64_t id){
     m_cv.notify_one();
 }
 
-void PeriodicTasks::PeriodicPool::stopTask(uint64_t id){
+void PeriodicTasks::PeriodicPool::stopTask(task_id_hash id){
     std::unique_lock lock(m_mutex);
     auto it = m_tasks.find(id);
     if(it != m_tasks.end()){
         it->second->stopped = true;
+    }
+    m_cv.notify_one();
+}
+
+void PeriodicTasks::PeriodicPool::deleteTask(task_id_hash id){
+    std::unique_lock lock(m_mutex);
+    auto it = m_tasks.find(id);
+    if(it != m_tasks.end()){
+        m_tasks.erase(it);
     }
     m_cv.notify_one();
 }

@@ -15,11 +15,12 @@ namespace PeriodicTasks{
 
     using Clock = std::chrono::steady_clock;
     using TimePoint = Clock::time_point;
+    using task_id_hash = size_t;
 
     struct PeriodicTaskDescriptor{
         using PeriodicTask = std::function<void()>;
 
-        uint64_t        id;
+        task_id_hash    id;
         std::string     name;
         uint64_t        period;
         TimePoint       next_run;
@@ -47,10 +48,11 @@ namespace PeriodicTasks{
         PeriodicPool();
         ~PeriodicPool();
 
-        uint64_t addTask(PeriodicTaskDescriptor&& task);
-        void pauseTask(uint64_t id);
-        void resumeTask(uint64_t id);
-        void stopTask(uint64_t id);
+        task_id_hash addTask(PeriodicTaskDescriptor&& task);
+        void pauseTask(task_id_hash id);
+        void resumeTask(task_id_hash id);
+        void stopTask(task_id_hash id);
+        void deleteTask(task_id_hash id);
 
         void runPool();
         void stopPool();
@@ -61,9 +63,8 @@ namespace PeriodicTasks{
     private:
         std::thread m_worker;
         std::atomic<bool> m_stop;
-        uint64_t m_next_task_id;
 
-        std::unordered_map<uint64_t, std::shared_ptr<PeriodicTaskDescriptor>>m_tasks;
+        std::unordered_map<task_id_hash, std::shared_ptr<PeriodicTaskDescriptor>>m_tasks;
         std::priority_queue<std::shared_ptr<PeriodicTaskDescriptor>, std::vector<std::shared_ptr<PeriodicTaskDescriptor>>, CompareNextRun> m_heap;
         std::mutex m_mutex;
         std::condition_variable m_cv;
