@@ -1165,17 +1165,15 @@ void TgBot::getPurchasedItemsList(int chat_id){
     auto& links = db_res["data"];
     if(db_res["ok"].get<bool>()){
         int counter = 0;
+        std::stringstream out;
         for(auto& link: links){
-            std::stringstream out;
 
             out << counter++ << ". " << link["title"] << "| "
                 << "*" << link["amount"] << "*" << "шт| " 
                 << "*" << link["buy_price"] << "*" << std::endl;
-            std::string prepared_str = StringMisc::escapeString(out.str(), "_~>#+-=|{}.!()");
-            prepared_str = StringMisc::removeQuotes(prepared_str);
-            sendMessage(chat_id, prepared_str, {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");
 
         }
+        sendMessage(chat_id, StringMisc::removeQuotes(out.str()), {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "_~>#+-=|{}.!()");
         sendMessage(chat_id, "*Список покупок*", steamPurchaseListMenu(), ParseMode::eMARKDOWN_V2);
     }
     else {
