@@ -11,6 +11,7 @@
 #include "worker_pool.h"
 #include "bot_config.h"
 #include "periodic_pool.h"
+#include "purchased_item.h"
 
 #include "nlohmann/json.hpp"
 #include <tuple>
@@ -118,10 +119,10 @@ private:
     bool deleteSteamLink(uint64_t, const std::string& title);
 
     json getUserLinkPriceOverview(const std::string& link_url);
-    std::string convertUserLinkMinimal(const json& link);
+    std::string convertUserLinkMinimal(const WatchLink& link);
 
-    std::string getUserItemChart(const json& link);
-    std::string getUserItemPriceAnalysys(const json& link, const json& price);
+    std::string getUserItemChart(const WatchLink& link);
+    std::string getUserItemPriceAnalysys(const PurchasedItem& item, const json& price);
     //Launch functions
     void updateBotCommands(const json& commands);
     void uploadSurveyTasks();

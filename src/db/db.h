@@ -8,12 +8,18 @@
 #include "string_misc.h"
 #include "survey_link.h"
 #include "db_pagination.h"
+#include "watch_link.h"
+#include "purchased_item.h"
+#include "user.h"
 
 #define DATABASE_DEBUG
+#define DATABASE_THROW_EXCEPTION(msg) do {throw std::runtime_error(std::string(__func__) + ": " + msg);}while(0)
 
 class DataBase{
 public:
-    
+    enum UserId{
+        UNKNOWN_USER = -1,
+    };
     DataBase(const std::string& file);
     ~DataBase();
 
@@ -23,21 +29,23 @@ public:
     void initSchema();
 
     int64_t addUser(int64_t chat_id, const std::string& username, const std::string& first_name);
-    int64_t getUserId(int64_t chat_id);
-    nlohmann::json getUsers(const DataBasePagination& pag);
+    std::optional<int64_t> getUserId(int64_t chat_id);
+    std::vector<User> getUsers(const DataBasePagination& pag);
     //Watch list functions
-    std::vector<nlohmann::json> getUserLinks(uint64_t chat_id);
-    nlohmann::json getUserLinkByTitle(uint64_t chat_id, const std::string& title);
+    std::vector<WatchLink> getUserLinks(uint64_t chat_id);
+    std::vector<WatchLink> getUserLinksJoin(uint64_t chat_id);
+    std::optional<WatchLink> getUserLinkByTitle(uint64_t chat_id, const std::string& title);
     bool addUserLink(uint64_t chat_id, const std::string& link, const std::string& title);
     bool deleteUserLink(uint64_t chat_id, const std::string& title);
     //Purchaised list functions
     bool addUserItemBuyInfo(uint64_t chat_id, const UserContext::ItemBuyInfo& info);
-    nlohmann::json deleteUserItemBuyInfo(uint64_t chat_id, const std::string& title, float buy_price, int amount);
-    nlohmann::json getUserItemsBuyInfo(uint64_t chat_id);
+    std::optional<PurchasedItem> deleteUserItemBuyInfo(uint64_t chat_id, const std::string& title, float buy_price, int amount);
+    std::vector<PurchasedItem> getUserItemsBuyInfo(uint64_t chat_id);
+    std::vector<PurchasedItem> getUserItemsBuyInfoJoin(uint64_t chat_id);
     //Survey list functions
-    int64_t addUserSurveyLink(const SurveyLink& survey_link);
-    std::vector<SurveyLink>  getUserSurveyLinks(uint64_t chat_id, const DataBasePagination& pag);
-    std::vector<size_t>      deleteSurveyLink(uint64_t chat_id, const std::string& title);
+    int64_t                     addUserSurveyLink(const SurveyLink& survey_link);
+    std::vector<SurveyLink>     getUserSurveyLinks(uint64_t chat_id, const DataBasePagination& pag);
+    std::vector<SurveyLink>     deleteSurveyLink(uint64_t chat_id, const std::string& title);
     //Other functions
     nlohmann::json setUserCurrency(uint64_t chat_id, const std::string& currency);
 private:

@@ -149,7 +149,9 @@ void TgBot::handleUpdate(const json& update){
         if(std::get<0>(user_state) == BotContext::BotState::INVALID){
             m_context.setUserContext(chat_id, std::make_tuple(BotContext::BotState::MAIN_MENU, username));
         }
-        auto user_id = m_sqlite_db->addUser(chat_id, username, first_name);
+        if(!m_sqlite_db->getUserId(chat_id) == DataBase::UserId::UNKNOWN_USER){
+            auto user_id = m_sqlite_db->addUser(chat_id, username, first_name);
+        }
         //Handling text messages
         if(message.contains("text")){
             auto text = message["text"].get<std::string>();
@@ -311,9 +313,10 @@ void TgBot::handleText(uint64_t chat_id, const std::string& text){
                 json keyboard;
                 keyboard["inline_keyboard"] = json::array();
                 keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_menu_string}} });
-                sendMessage(chat_id,
-                            "Введи купленное количество предметов по цене " + std::to_string(m_user_buy_item_info[chat_id].buy_price),
-                            keyboard);
+                std::stringstream out;
+                out << std::fixed << std::setprecision(2) <<
+                    "Введи купленное количество предметов по цене " << m_user_buy_item_info[chat_id].buy_price;
+                sendMessage(chat_id, out.str(), keyboard);
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_ADD_LINK_AMOUNT);
 
             }
@@ -394,6 +397,10 @@ void TgBot::loop(){
         this->uploadSurveyTasks();
     };
     m_workers_pool.enqueue(upload_task);
+    // auto links = m_sqlite_db->getUserLinksJoin(444431591);
+    // auto items = m_sqlite_db->getUserItemsBuyInfo(444431591);
+    // auto join_items = m_sqlite_db->getUserItemsBuyInfoJoin(444431591);
+    auto users = m_sqlite_db->getUsers((DataBasePagination){});
 
     auto gifts = getAvailableGifts().dump();
     uint64_t offset = 0;
@@ -887,14 +894,20 @@ void TgBot::handleCallbackQuery(const json& callback){
             float buy_value = std::stof(out.str());
             int amount = std::atoi(tokens[2].c_str());
 
-            auto res = m_sqlite_db->deleteUserItemBuyInfo(chat_id, tokens[1], buy_value, amount);
-            if(res["ok"]){
+            auto item_opt = m_sqlite_db->deleteUserItemBuyInfo(chat_id, tokens[1], buy_value, amount);
+            if(item_opt.has_value()){
+                auto& item = item_opt.value();
+                std::stringstream out;
+                out << std::fixed << std::setprecision(2)  <<
+                    "Удалено: " << item.title << " " << item.buy_price << " " << item.amount << "шт";
 
-                sendMessage(chat_id, "OK", steamPurchaseListMenu());
+                sendMessage(chat_id, out.str(), steamPurchaseListMenu());
             }
             else {
-                sendMessage(chat_id, res["error_msg"], steamPurchaseListMenu());
-
+                std::stringstream out;
+                out << std::fixed << std::setprecision(2)  <<
+                    "Ошибка удаления: " << tokens[1] << " " << buy_value << " " << amount << "шт";
+                sendMessage(chat_id, "", steamPurchaseListMenu());
             }
             m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
         }
@@ -918,40 +931,43 @@ void TgBot::handleCallbackQuery(const json& callback){
                 period_min = std::atoi(payload[payload.size() - 1].c_str());
             else
                 throw std::runtime_error("Fail to parse callback data " + data);
-            auto link = m_sqlite_db->getUserLinkByTitle(chat_id, title);
-            SurveyLink survey_link( link["url"].get<std::string>(),
-                                    link["title"].get<std::string>(),
-                                    period_min,
-                                    chat_id);
+            auto link_opt = m_sqlite_db->getUserLinkByTitle(chat_id, title);
+            if(link_opt.has_value()){
+                auto& link = link_opt.value();
+                SurveyLink survey_link( link.url,
+                                        link.title,
+                                        period_min,
+                                        chat_id);
 
-            auto link_id = m_sqlite_db->addUserSurveyLink(survey_link);
-            if(link_id != -1){
-                std::cout << link << std::endl;
+                auto link_id = m_sqlite_db->addUserSurveyLink(survey_link);
+                if(link_id != -1){
+                    std::cout << link.repr() << std::endl;
 
-                auto task = createSurveyTask(survey_link);
-                addPeriodicTask(std::move(task));
+                    auto task = createSurveyTask(survey_link);
+                    addPeriodicTask(std::move(task));
 
-                editMessageText(chat_id, message_id, "Ссылка добавлена в список опроса", steamSurveyListMenu());
-                m_context.switchState(chat_id, BotContext::BotState::STEAM_SURVEY_LIST_MENU);
-            }
-            else{
-                nlohmann::json keyboard;
-                keyboard["inline_keyboard"].push_back({ {{ "text", "❌В меню"},                 {"callback_data", c_steam_survey_list_menu_string}} });
-                editMessageText(chat_id, message_id, "Ошибка добавления в список опроса",
-                                keyboard, TgBot::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW,
-                                "_~>#+-=|{}.!()");
+                    editMessageText(chat_id, message_id, "Ссылка добавлена в список опроса", steamSurveyListMenu());
+                    m_context.switchState(chat_id, BotContext::BotState::STEAM_SURVEY_LIST_MENU);
+                }
+                else{
+                    nlohmann::json keyboard;
+                    keyboard["inline_keyboard"].push_back({ {{ "text", "❌В меню"},                 {"callback_data", c_steam_survey_list_menu_string}} });
+                    editMessageText(chat_id, message_id, "Ошибка добавления в список опроса",
+                                    keyboard, TgBot::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW,
+                                    "_~>#+-=|{}.!()");
+                }
             }
         }
         else if(user_bot_state == BotContext::BotContext::STEAM_SURVEY_LIST_DELETE_LINK){
             std::string data = callback["data"];
             std::cout << data << std::endl;
-            auto deleted_task_id_hash = m_sqlite_db->deleteSurveyLink(chat_id, data);
-            if(!deleted_task_id_hash.empty()){
+            auto deleted_tasks = m_sqlite_db->deleteSurveyLink(chat_id, data);
+            if(!deleted_tasks.empty()){
                 // auto task_id_hash = std::atres["data"].get<std::string>());
-                for(auto& id: deleted_task_id_hash){
-                    deletePeriodicTask(chat_id, id);
+                for(auto& task: deleted_tasks){
+                    deletePeriodicTask(chat_id, task.task_id_hash);
                 }
-                sendMessage(chat_id, "Успешно удалено " + std::to_string(deleted_task_id_hash.size()) + " задач", steamSurveyListMenu());
+                sendMessage(chat_id, "Успешно удалено " + std::to_string(deleted_tasks.size()) + " задач", steamSurveyListMenu());
                 m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
             }
             else{
@@ -1013,10 +1029,8 @@ json TgBot::getUserLinkPriceOverview(const std::string& link_url){
     return result;
 }
 
-std::string TgBot::convertUserLinkMinimal(const json& link){
-    auto& url = link["url"];
-    auto& title = link["title"];
-    return StringMisc::createMarkdownLink(url, title);
+std::string TgBot::convertUserLinkMinimal(const WatchLink& link){
+    return StringMisc::createMarkdownLink(link.url, link.title);
 }
 
 nlohmann::json TgBot::createInlineKeyboard(const std::vector<std::pair<std::string, std::string>>& buttons,
@@ -1051,9 +1065,9 @@ nlohmann::json TgBot::createInlineKeyboard(const std::vector<std::pair<std::stri
     return keyboard;
 }
 
-std::string TgBot::getUserItemChart(const json& link){
+std::string TgBot::getUserItemChart(const WatchLink& link){
     try{
-        auto market_hash_name = StringMisc::getUriNameFromSteamLink(link["url"].get<std::string>());
+        auto market_hash_name = StringMisc::getUriNameFromSteamLink(link.url);
         auto item_name = StringMisc::uriToString(market_hash_name);
         auto time_period = PriceHistory::eTimePeriod::MONTH;
 
@@ -1079,10 +1093,9 @@ std::string TgBot::getUserItemChart(const json& link){
     }
 }
 
-std::string TgBot::getUserItemPriceAnalysys(const json& link, const json& price){
+std::string TgBot::getUserItemPriceAnalysys(const PurchasedItem& item, const json& price){
     std::stringstream ss;
     auto temp1 = price.dump();
-    auto temp2 = link.dump();
     float cur_price = 0, buy_price = 0, profit_price = 0;
     uint64_t amount = 0;
     switch(c_steam_currency){
@@ -1093,15 +1106,15 @@ std::string TgBot::getUserItemPriceAnalysys(const json& link, const json& price)
                 cur_price_.erase(index, 1);
 
             cur_price = std::stof(cur_price_);
-            amount = std::stoi(link["amount"].get<std::string>());
-            buy_price = std::stof(link["buy_price"].get<std::string>());
+            amount = static_cast<uint64_t>(item.amount);
+            buy_price = item.buy_price;
             profit_price = buy_price * 1.15; //Steam comission is 15%
 
         }
         break;
         default: break;
     }
-    auto markdown_link = StringMisc::createMarkdownLink(link["url"], link["title"]);
+    auto markdown_link = StringMisc::createMarkdownLink(item.url, item.title);
 
     ss << std::fixed << std::setprecision(2) << 
           "Цена покупки: *" << buy_price << "*\n" <<
@@ -1140,16 +1153,14 @@ void TgBot::updateBotCommands(const json& commands){
 }
 
 void TgBot::deletePurchasedItem(int chat_id){
-    auto db_res = m_sqlite_db->getUserItemsBuyInfo(chat_id);
-    auto& links = db_res["data"];
+    auto items = m_sqlite_db->getUserItemsBuyInfo(chat_id);
     std::vector<std::pair<std::string, std::string>> buttons;
     int counter = 0;
-    for(auto& link: links){
+    for(auto& item: items){
         std::stringstream out;
-        out << counter++ << "|" << link["title"] << "|"
-                        << link["amount"] << "|" 
-                        << link["buy_price"] << std::endl;
-        // std::string title = link["title"];
+        out << counter++ << "|" << item.title << "|"
+                        << item.amount << "|" 
+                        << item.buy_price << std::endl;
         buttons.emplace_back(StringMisc::removeQuotes(out.str()), "");
     }
     auto keyboard = createInlineKeyboard(buttons, "", 1);
@@ -1161,58 +1172,52 @@ void TgBot::deletePurchasedItem(int chat_id){
 
 void TgBot::getPurchasedItemsList(int chat_id){
     std::cout << "Requested purchased items info" << std::endl;
-    auto db_res = m_sqlite_db->getUserItemsBuyInfo(chat_id);
-    auto& links = db_res["data"];
-    if(db_res["ok"].get<bool>()){
+    auto items = m_sqlite_db->getUserItemsBuyInfo(chat_id);
+    if(items.size() > 0){
         int counter = 0;
         std::stringstream out;
-        for(auto& link: links){
+        for(auto& item: items){
 
-            out << counter++ << ". " << link["title"] << "| "
-                << "*" << link["amount"] << "*" << "шт| " 
-                << "*" << link["buy_price"] << "*" << std::endl;
+            out << counter++ << ". " << item.title << "| "
+                << "*" << item.amount << "*" << "шт| " 
+                << "*" << item.buy_price << "*" << std::endl;
 
         }
         sendMessage(chat_id, StringMisc::removeQuotes(out.str()), {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "_~>#+-=|{}.!()");
         sendMessage(chat_id, "*Список покупок*", steamPurchaseListMenu(), ParseMode::eMARKDOWN_V2);
     }
     else {
-        sendMessage(chat_id, "Ошибка: " + db_res["error_msg"].get<std::string>(), steamPurchaseListMenu());
+        sendMessage(chat_id, "Список закупок пуст", steamPurchaseListMenu());
     }
     m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
 }
 
 void TgBot::getPurchasedItemsData(int chat_id){
-    auto db_res = m_sqlite_db->getUserItemsBuyInfo(chat_id);
-    auto& links = db_res["data"];
+    auto items = m_sqlite_db->getUserItemsBuyInfo(chat_id);
     
-    if(db_res["ok"].get<bool>()){
-        if(links.size() < 0){
-            sendMessage(chat_id, "Список о запупках пуст", steamPurchaseListMenu());
-            m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
-            return;
-        }
-        for(auto& link: links){
-            std::cout << "\t" << link["url"] << ": " << link["title"] << std::endl;
-            auto price_res = getUserLinkPriceOverview(link["url"].get<std::string>());
+    if(items.size() > 0){
+        for(auto& item: items){
+            std::cout << "\t" << item.url << ": " << item.title << std::endl;
+            auto price_res = getUserLinkPriceOverview(item.url);
             auto temp = price_res.dump();
             if(price_res["json"]["lowest_price"].is_null()){
 
-                sendMessage(chat_id, "Ошибка запроса: " + link["url"].get<std::string>(), {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW);                            continue;
+                sendMessage(chat_id, "Ошибка запроса: " + item.url, {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "_~>#+-=|{}.!()");                            continue;
             }
-            auto out = getUserItemPriceAnalysys(link, price_res["json"]);
+            auto out = getUserItemPriceAnalysys(item, price_res["json"]);
             sendMessage(chat_id, out, {}, ParseMode::eMARKDOWN_V2, MessageWebPreview::eDISABLE_WEB_PREVIEW, "");
         }
         sendMessage(chat_id, "*Список покупок*", steamPurchaseListMenu(), ParseMode::eMARKDOWN_V2);
     }
     else{
-        sendMessage(chat_id, "Ошибка: " + db_res["error_msg"].get<std::string>(), steamPurchaseListMenu());
+        sendMessage(chat_id, "Список закупок пуст", steamPurchaseListMenu());
     }
     m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
 }
 
 void TgBot::sendPurchasedItemsMenu(int chat_id){
-    auto links = m_sqlite_db->getUserLinks(chat_id);
+    // auto links = m_sqlite_db->getUserLinks(chat_id);
+    auto links = m_sqlite_db->getUserLinksJoin(chat_id);
     if(links.size() <= 0){
         sendMessage(chat_id, "Список пустой", steamPurchaseListMenu());
         m_context.switchState(chat_id, BotContext::BotState::STEAM_PURCHASE_LIST_MENU);
@@ -1220,8 +1225,7 @@ void TgBot::sendPurchasedItemsMenu(int chat_id){
     else{
         std::vector<std::pair<std::string, std::string>> buttons;
         for(auto& link: links){
-            std::string title = link["title"];
-            buttons.emplace_back(title, "");
+            buttons.emplace_back(link.title, "");
         }
         auto keyboard = createInlineKeyboard(buttons, "", 2);
         keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_purchase_list_menu_string}} });
@@ -1232,7 +1236,8 @@ void TgBot::sendPurchasedItemsMenu(int chat_id){
 }
 
 void TgBot::sendWatchListDeleteMenu(int chat_id){
-    auto links = m_sqlite_db->getUserLinks(chat_id);
+    // auto links = m_sqlite_db->getUserLinks(chat_id);
+    auto links = m_sqlite_db->getUserLinksJoin(chat_id);
     if(links.size() <= 0){
         sendMessage(chat_id, "Список пустой", steamWatchListMenu());
         m_context.switchState(chat_id, BotContext::BotState::STEAM_WATCH_LIST_MENU);
@@ -1240,8 +1245,7 @@ void TgBot::sendWatchListDeleteMenu(int chat_id){
     else{
         std::vector<std::pair<std::string, std::string>> buttons;
         for(auto& link: links){
-            std::string title = link["title"];
-            buttons.emplace_back(title, "");
+            buttons.emplace_back(link.title, "");
         }
         auto keyboard = createInlineKeyboard(buttons, "", 2);
         keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_watch_list_menu_string}} });
@@ -1252,12 +1256,11 @@ void TgBot::sendWatchListDeleteMenu(int chat_id){
 }
 
 void TgBot::getWatchListItemsData(int chat_id){
-
-    auto links = m_sqlite_db->getUserLinks(chat_id);
+    auto links = m_sqlite_db->getUserLinksJoin(chat_id);
     if(links.size() > 0){
         for(const auto& link: links){
-            auto markdown_link = StringMisc::createMarkdownLink(link["url"], StringMisc::escapeString(StringMisc::uriToString(link["title"])));
-            auto result = getUserLinkPriceOverview(link["url"].get<std::string>());
+            auto markdown_link = StringMisc::createMarkdownLink(link.url, StringMisc::escapeString(StringMisc::uriToString(link.title)));
+            auto result = getUserLinkPriceOverview(link.url);
             auto item_name = StringMisc::escapeString(result["caption"].get<std::string>(), "-(){}|.,=");
             try {
                 auto png_path = getUserItemChart(link);
@@ -1334,8 +1337,7 @@ void TgBot::sendSurveyListAddMenu(int chat_id, int message_id=-1){
     auto links = m_sqlite_db->getUserLinks(chat_id);
     std::vector<std::pair<std::string, std::string>> buttons;
     for(auto& link: links){
-        std::string title = link["title"];
-        buttons.emplace_back(title, "");
+        buttons.emplace_back(link.title, "");
     }
     auto keyboard = createInlineKeyboard(buttons, "", 2);
     keyboard["inline_keyboard"].push_back({ {{ "text", "❌Отмена"},                 {"callback_data", c_steam_survey_list_menu_string}} });
@@ -1417,13 +1419,12 @@ void TgBot::getSurveyListUserLinks(int chat_id, int message_id=-1){
 
 void TgBot::uploadSurveyTasks(){
     DataBasePagination pag = {.offset = 0, .limit = 0,};
-    auto res = m_sqlite_db->getUsers(pag);
-    auto& users = res["data"];
+    auto users = m_sqlite_db->getUsers(pag);
 
-    if(res["ok"]){
+    if(users.size() > 0){
         for(auto& user: users){
-            auto username = user["username"].get<std::string>();
-            auto chat_id = static_cast<uint64_t>(std::atoi(user["chat_id"].get<std::string>().c_str()));
+            auto username = user.username;
+            auto chat_id = static_cast<uint64_t>(user.chat_id);
             auto links = m_sqlite_db->getUserSurveyLinks(chat_id, (DataBasePagination){});
             if(!links.empty()){
                 for(auto link: links){
@@ -1434,7 +1435,7 @@ void TgBot::uploadSurveyTasks(){
         }
     }
     else{
-        std::cout << "WARNING: " << res["error_msg"].get<std::string>() << std::endl;
+        std::cout << "WARNING: Empty User list" << std::endl;
     }
 
 }
