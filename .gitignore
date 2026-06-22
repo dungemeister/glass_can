@@ -6,3 +6,4 @@ charts/*
 *.cookie
 .vscode/*
 *.json
+/unit_tests
