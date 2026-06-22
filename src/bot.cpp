@@ -139,6 +139,7 @@ json TgBot::getUpdates(uint64_t offset){
 }
 
 void TgBot::handleUpdate(const json& update){
+    std::cout << update.dump(4) << std::endl<< std::endl<< std::endl;
     if(update.contains("message")){
         auto message = update["message"];
         std::string username = message["chat"]["username"];
@@ -1423,8 +1424,8 @@ void TgBot::uploadSurveyTasks(){
 
     if(users.size() > 0){
         for(auto& user: users){
-            auto username = user.username;
-            auto chat_id = static_cast<uint64_t>(user.chat_id);
+            auto username = user.get_username();
+            auto chat_id = static_cast<uint64_t>(user.get_chat_id());
             auto links = m_sqlite_db->getUserSurveyLinks(chat_id, (DataBasePagination){});
             if(!links.empty()){
                 for(auto link: links){

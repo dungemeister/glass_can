@@ -12,8 +12,6 @@
 #include "purchased_item.h"
 #include "user.h"
 
-#define DATABASE_DEBUG
-#define DATABASE_THROW_EXCEPTION(msg) do {throw std::runtime_error(std::string(__func__) + ": " + msg);}while(0)
 
 class DataBase{
 public:

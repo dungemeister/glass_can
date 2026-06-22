@@ -1,0 +1,11 @@
+#pragma once
+
+enum class UserActionState{
+    MAIN_MENU,
+    STEAM_MAIN_MANU,
+    //STEAM SUBMENUS
+    STEAM_PURCHASED_LIST,
+    STEAM_WATCH_LIST,
+    STEAM_SURVEY_LIST,
+    STEAM_NOTIFICATION_LIST,
+};

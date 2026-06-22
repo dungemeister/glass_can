@@ -589,11 +589,11 @@ std::vector<User> DataBase::getUsers(const DataBasePagination& pag){
         debugPrintQuery(stmt);
         while(sqlite3_step(stmt) == SQLITE_ROW){
             User user;
-            user.chat_id    = sqlite3_column_int64(stmt, 1);
-            user.username   = std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2)));
-            user.first_name = std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3)));
-            user.created_at = std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4)));
-            user.currency   = std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5)));
+            user.set_chat_id(sqlite3_column_int64(stmt, 1));     ;
+            user.set_username(std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2))));    ;
+            user.set_first_name(std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3))));  ;
+            user.set_created_at(std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4))));  ;
+            user.set_currency(std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5))));    ;
             
             res.emplace_back(std::move(user));
         }

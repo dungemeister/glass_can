@@ -152,7 +152,6 @@ namespace StringMisc{
         std::stringstream sstream(input);
 
         while(std::getline(sstream, token, delim)){
-            std::cout << token << std::endl;
             tokens.push_back(std::move(token));
         }
 
