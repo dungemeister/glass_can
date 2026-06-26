@@ -12,6 +12,7 @@ public:
     std::vector<WatchLink>  getLinks(const User& user);
     void                    addLink(const WatchLink& link);
     void                    deleteLink(const WatchLink& link);
+    WatchLink               getLinkFromTitle(const User& user, const std::string& title);
 private:
     std::shared_ptr<Sqlite3Connection> m_conn;
 

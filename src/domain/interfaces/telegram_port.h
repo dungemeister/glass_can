@@ -24,7 +24,15 @@ public:
                             ParseMode mode=ParseMode::MARKDOWN_V2,
                             MessageWebPreview web_preview=MessageWebPreview::ENABLE_PREVIEW,
                             const std::string& espace_symbols="_~>#+-=|{}.!") = 0;
-                             
+
+    virtual void editMessage(uint64_t chat_id,
+                            const std::string& text,
+                            uint64_t  update_msg_id,
+                            const std::vector<inline_button>& inline_keyboard={},
+                            ParseMode mode=ParseMode::MARKDOWN_V2,
+                            MessageWebPreview web_preview=MessageWebPreview::ENABLE_PREVIEW,
+                            const std::string& espace_symbols="_~>#+-=|{}.!") = 0;
+
     virtual std::vector<BotEvent> getUpdates(int64_t& offset) = 0;
     
     virtual void sendMainMenu(uint64_t chat_id) = 0;
@@ -33,4 +41,11 @@ public:
     virtual void sendSteamWatchMenu(uint64_t chat_id) = 0;
     virtual void sendSteamSurveyMenu(uint64_t chat_id) = 0;
     virtual void sendSteamNotificationMenu(uint64_t chat_id) = 0;
+
+    virtual void editMainMenu(uint64_t chat_id, uint64_t message_id) = 0;
+    virtual void editSteamMainMenu(uint64_t chat_id, uint64_t message_id) = 0;
+    virtual void editSteamPurchasedMenu(uint64_t chat_id, uint64_t message_id) = 0;
+    virtual void editSteamWatchMenu(uint64_t chat_id, uint64_t message_id) = 0;
+    virtual void editSteamSurveyMenu(uint64_t chat_id, uint64_t message_id) = 0;
+    virtual void editSteamNotificationMenu(uint64_t chat_id, uint64_t message_id) = 0;
 };

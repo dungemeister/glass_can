@@ -11,10 +11,13 @@ namespace inline_menu{
     const std::string c_steam_survey_list_menu_cb_data               = "steam_survey_list_menu";
     const std::string c_steam_notification_list_menu_cb_data         = "steam_notification_list_menu";
     //Watch list callback_data
-    const std::string c_steam_watch_list_list_cb_data    = "steam_watch_list_list_btn";
-    const std::string c_steam_watch_list_add_cb_data     = "steam_watch_list_add_btn";
-    const std::string c_steam_watch_list_delete_cb_data  = "steam_watch_list_delete_btn";
-    const std::string c_steam_watch_list_info_cb_data    = "steam_watch_list_info_btn";
+    const std::string c_steam_watch_list_list_cb_data           = "steam_watch_list_list_btn";
+    const std::string c_steam_watch_list_add_cb_data            = "steam_watch_list_add_btn";
+    const std::string c_steam_watch_list_delete_list_cb_data    = "steam_watch_list_delete_list_btn";
+    const std::string c_steam_watch_list_delete_cb_data         = "steam_watch_list_delete_btn";
+    const std::string c_steam_watch_list_info_cb_data           = "steam_watch_list_info_btn";
+
+    const std::string c_watch_list_delete_prefix = "wdelete";
     //Survey list callback_data
     const std::string c_steam_survey_list_list_cb_data    = "steam_survey_list_list_btn";
     const std::string c_steam_survey_list_add_cb_data     = "steam_survey_list_add_btn";
@@ -25,6 +28,7 @@ namespace inline_menu{
     const std::string c_steam_notification_list_add_cb_data     = "steam_notific_list_add_btn";
     const std::string c_steam_notification_list_delete_cb_data  = "steam_notific_list_delete_btn";
     const std::string c_steam_notification_list_info_cb_data    = "steam_notific_list_info_btn";
+    
     class BotInlineMenus{
         using json = nlohmann::json;
     public:
@@ -58,7 +62,7 @@ namespace inline_menu{
             std::vector<std::pair<std::string, std::string>> buttons;
             buttons.emplace_back("📋Отобразить список",  c_steam_watch_list_list_cb_data);
             buttons.emplace_back("➕Добавить предмет",   c_steam_watch_list_add_cb_data);
-            buttons.emplace_back("➖Удалить предмет",    c_steam_watch_list_delete_cb_data);
+            buttons.emplace_back("➖Удалить предмет",    c_steam_watch_list_delete_list_cb_data);
             buttons.emplace_back("📈Графики предметов",  c_steam_watch_list_info_cb_data);
             buttons.emplace_back("🔄В главное меню",     c_steam_menu_cb_data);
             return buttons;

@@ -60,6 +60,7 @@ std::optional<User> UserSqliteRepository::getUser(int chat_id){
             user.set_first_name(std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3))));
             user.set_created_at(std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4))));
             user.set_currency(std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5))));
+            user.set_state(std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 6))));
             
             sqlite3_finalize(stmt);
             return user;
@@ -74,8 +75,8 @@ std::optional<User> UserSqliteRepository::getUser(int chat_id){
 
 void UserSqliteRepository::save(const User& user){
     std::string q = R"(
-    INSERT OR REPLACE INTO users (id, chat_id, username, first_name, created_at, currency) 
-    VALUES (?, ?, ?, ?, ?, ?);
+    INSERT OR REPLACE INTO users (id, chat_id, username, first_name, created_at, currency, state) 
+    VALUES (?, ?, ?, ?, ?, ?, ?);
     )";
     sqlite3_stmt* stmt;
     try{
@@ -91,6 +92,7 @@ void UserSqliteRepository::save(const User& user){
         sqlite3_bind_text(stmt, 4, user.get_first_name().c_str(), -1, SQLITE_TRANSIENT);
         sqlite3_bind_text(stmt, 5, user.get_created_at().c_str(), -1, SQLITE_TRANSIENT);
         sqlite3_bind_text(stmt, 6, user.get_currency().c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 7, user.get_state().c_str(), -1, SQLITE_TRANSIENT);
         debugPrintQuery(stmt);
         if(sqlite3_step(stmt) == SQLITE_DONE){
             

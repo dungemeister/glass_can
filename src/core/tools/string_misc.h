@@ -2,6 +2,7 @@
 #include <string>
 #include <iostream>
 #include "nlohmann/json.hpp"
+#include <regex>
 
 namespace StringMisc{
 
@@ -158,11 +159,20 @@ namespace StringMisc{
         return tokens;
     }
 
+    static std::vector<std::string> splitByRegex(const std::string& input, const std::regex& delim_pattern){
+
+        std::sregex_token_iterator iter(input.begin(), input.end(), delim_pattern, -1);
+        std::sregex_token_iterator end;
+
+        std::vector<std::string> res(iter, end);
+        return res;
+    }
+
     static std::vector<std::string> splitOnceByDelim(const std::string& input, char delim, SplitOnce start=SplitOnce::FROM_START){
         std::vector<std::string> tokens;
         size_t pos;
         if(start == SplitOnce::FROM_START) pos = input.find(delim);
-        if(start == SplitOnce::FROM_END) pos = input.rfind(delim);
+        else if(start == SplitOnce::FROM_END) pos = input.rfind(delim);
         else return {};
         
         if(pos == std::string::npos) return {};

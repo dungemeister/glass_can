@@ -42,16 +42,12 @@ public:
 
             if constexpr (std::is_same_v<T, MessageEvent>) {
                 callback(concrete.username + ": " + concrete.text);
-                m_tg_client->sendMessage(static_cast<uint64_t>(concrete.chat_id), concrete.text,
-                                        {},
-                                        ITelegramPort::ParseMode::MARKDOWN_V2,
-                                        ITelegramPort::MessageWebPreview::ENABLE_PREVIEW,
-                                        "_~>#+-=|{}.!"
-                                        );
+                handleMessageEvent(concrete);
+
             }
             else if constexpr (std::is_same_v<T, CallbackEvent>){
                 callback(concrete.username + ": " + concrete.callback_data);
-                callbackStateHandler(concrete.chat_id, concrete.callback_data);
+                callbackStateHandler(concrete, concrete.callback_data);
                 // m_tg_client.sendMessage(concrete.chat_id, concrete.callback_data);
             }
             else if constexpr (std::is_same_v<T, CommandEvent>){
@@ -80,44 +76,121 @@ private:
     std::shared_ptr<IWatchLinkRepository> m_watch_rep;
     std::unordered_map<std::string, CommandHandler> m_commands;
 
-    void callbackStateHandler(uint64_t chat_id, const std::string& callback_data){
+    void callbackStateHandler(CallbackEvent event, const std::string& callback_data){
         // 1.Получаем текущий статус пользователя из БД
-        auto user_opt = m_user_rep->getUser(chat_id);
+        auto user_opt = m_user_rep->getUser(event.chat_id);
         if(!user_opt.has_value()){
             LOG_ERROR("Fail to handle user callback data. User not found in DB");
             return;
         }
         // 2.Обрабатываем данные в соответствие со статусом
         auto& user = user_opt.value();
+        auto args = StringMisc::splitByDelim(callback_data, ' ');
+        auto& command = args[0];
+
         // Handling steam menu buttons for different lists
         if(callback_data == inline_menu::c_steam_menu_cb_data){
-            m_tg_client->sendSteamMainMenu(chat_id);
+            m_tg_client->sendSteamMainMenu(event.chat_id);
+            if(user.get_state() != "normal_work"){
+                set_user_state(user, "normal_work");
+            }
         }
         else if(callback_data == inline_menu::c_steam_purchase_list_menu_cb_data){
-            m_tg_client->sendSteamPurchasedMenu(chat_id);
+            m_tg_client->editSteamPurchasedMenu(event.chat_id, event.message_id);
+            if(user.get_state() != "normal_work"){
+                set_user_state(user, "normal_work");
+            }
         }
         else if(callback_data == inline_menu::c_steam_watch_list_menu_cb_data){
-            m_tg_client->sendSteamWatchMenu(chat_id);
+            m_tg_client->editSteamWatchMenu(event.chat_id, event.message_id);
+            if(user.get_state() != "normal_work"){
+                set_user_state(user, "normal_work");
+            }
         }
         else if(callback_data == inline_menu::c_steam_survey_list_menu_cb_data){
-            m_tg_client->sendSteamSurveyMenu(chat_id);
+            m_tg_client->editSteamSurveyMenu(event.chat_id, event.message_id);
+            if(user.get_state() != "normal_work"){
+                set_user_state(user, "normal_work");
+            }
         }
         else if(callback_data == inline_menu::c_steam_notification_list_menu_cb_data){
-            m_tg_client->sendSteamNotificationMenu(chat_id);
+            m_tg_client->editSteamNotificationMenu(event.chat_id, event.message_id);
+            if(user.get_state() != "normal_work"){
+                set_user_state(user, "normal_work");
+            }
         }
 
         else if(callback_data == inline_menu::c_steam_watch_list_list_cb_data){
             auto links = m_watch_rep->getLinks(user);
             auto links_qty = links.size();
             LOG_INFO("User links: " + std::to_string(links_qty));
-            m_tg_client->sendMessage(chat_id, "Количество строк " + std::to_string(links_qty));
-            sendUserWatchListItems(user);
+            sendUserWatchListItems(user, event);
         }
-        // 3.Отвечаем новым меню или сообщением
-        // m_tg_client->sendMessage(chat_id, "OK da");
+        else if(callback_data == inline_menu::c_steam_watch_list_add_cb_data){
+            try{
+                std::vector<std::pair<std::string, std::string>> buttons;
+                buttons.emplace_back("❌Отмена", inline_menu::c_steam_watch_list_menu_cb_data);
+
+                set_user_state(user, "wl_waiting_url");
+                m_tg_client->sendMessage(event.chat_id,
+                                        "Введи steam url в формате \\(url : title\\). Например, https://steamcommunity.com/market/listings/730/G18EE253004 : Гремучий кейс\n"
+                                        "[' : ' является разделителем]",
+                                        buttons,
+                                        ITelegramPort::ParseMode::MARKDOWN_V2,
+                                        ITelegramPort::MessageWebPreview::DISABLE_PREVIEW);
+            }
+            catch(std::exception& e){
+                LOG_ERROR(e.what());
+                m_tg_client->sendMessage(event.chat_id,
+                                        "Ошибка добавления",
+                                        inline_menu::BotInlineMenus::getSteamWatchMenuButtons());
+                set_user_state(user, "normal_work");
+            }
+        }
+        else if(command == inline_menu::c_watch_list_delete_prefix){
+            auto link_title = StringMisc::splitOnceByDelim(callback_data, ' ')[1];
+            WatchLink watch_link;
+            try{
+                watch_link = m_watch_rep->getLinkFromTitle(user, link_title);
+                m_watch_rep->deleteLink(watch_link);
+                m_tg_client->editMessage(event.chat_id,
+                                        "Ссылка " + watch_link.title + " удалена",
+                                        event.message_id,
+                                        inline_menu::BotInlineMenus::getSteamWatchMenuButtons());
+            }
+            catch(std::exception& e){
+                LOG_ERROR(e.what());
+                m_tg_client->editMessage(event.chat_id,
+                                        "Ссылка " + watch_link.title + " не удалена. Ошибка.",
+                                        event.message_id,
+                                        inline_menu::BotInlineMenus::getSteamWatchMenuButtons());
+            }
+        }
+        else if(callback_data == inline_menu::c_steam_watch_list_delete_list_cb_data){
+            try{
+                
+                std::vector<std::pair<std::string, std::string>> buttons;
+                auto links = m_watch_rep->getLinks(user);
+                for(auto& link: links){
+                    buttons.emplace_back(link.title, inline_menu::c_watch_list_delete_prefix + " " + link.title);
+                }
+                buttons.emplace_back("❌Отмена", inline_menu::c_steam_watch_list_menu_cb_data);
+
+                m_tg_client->editMessage(event.chat_id,
+                                        "Выбери предмет для удаления из списка отслеживания",
+                                        event.message_id,
+                                        buttons);
+            }
+            catch(std::exception& e){
+                LOG_ERROR(e.what());
+                m_tg_client->sendMessage(event.chat_id,
+                                        "Ошибка построения списка удаления",
+                                        inline_menu::BotInlineMenus::getSteamWatchMenuButtons());
+            }
+        }
     }
 
-    void sendUserWatchListItems(const User& user){
+    void sendUserWatchListItems(const User& user, const CallbackEvent& event){
         auto links = m_watch_rep->getLinks(user);
                 
         size_t index = 1;
@@ -126,8 +199,9 @@ private:
         for(const auto& link: links){
             out << index++ << " - " << convertUserLinkMinimal(link) << std::endl;
         }
-        m_tg_client->sendMessage(user.get_chat_id(),
+        m_tg_client->editMessage(event.chat_id,
                                 out.str(),
+                                event.message_id,
                                 inline_menu::BotInlineMenus::getSteamWatchMenuButtons(),
                                 ITelegramPort::ParseMode::MARKDOWN_V2,
                                 ITelegramPort::MessageWebPreview::DISABLE_PREVIEW);
@@ -135,5 +209,42 @@ private:
 
     std::string convertUserLinkMinimal(const WatchLink& link){
         return StringMisc::createMarkdownLink(link.url, link.title);
+    }
+
+    void handleMessageEvent(MessageEvent event){
+        auto user_opt = m_user_rep->getUser(event.chat_id);
+        if(!user_opt.has_value()){
+            LOG_ERROR("FAIL to get user from db with caht_id: " + std::to_string(event.chat_id));
+            return;
+        }
+        auto& user = user_opt.value();
+        auto user_state = user.get_state();
+        if(user_state == "normal_work"){
+            m_tg_client->sendMessage(event.chat_id, "Неизвестная команда. Воспользуйся меню");
+            m_tg_client->sendMainMenu(event.chat_id);
+        }
+        else if(user_state == "wl_waiting_url"){
+            set_user_state(user, "normal_work");
+
+            std::regex delim_pattern("\\s:\\s");
+            auto user_data = StringMisc::splitByRegex(event.text, delim_pattern);
+            if(user_data.size() < 2){
+                LOG_ERROR("FAIL to split user (url : title) from '" + event.text + "'. Returning");
+                m_tg_client->sendMessage(event.chat_id, "Ошибка добавления ссылки в список отслеживания.", inline_menu::BotInlineMenus::getSteamWatchMenuButtons());
+                return;
+            } 
+            auto& url = user_data[0];
+            auto& title = user_data[1];
+
+            WatchLink watch_link(event.chat_id, url, title);
+            m_watch_rep->addLink(watch_link);
+
+            m_tg_client->sendMessage(event.chat_id, "Ссылка '" + title + "' добавлена.", inline_menu::BotInlineMenus::getSteamWatchMenuButtons());
+        }
+    }
+
+    void set_user_state(User& user, const std::string& state){
+        user.set_state(state);
+        m_user_rep->save(user);
     }
 };

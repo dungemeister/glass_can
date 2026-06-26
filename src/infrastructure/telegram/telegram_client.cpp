@@ -176,6 +176,36 @@ void TelegramClient::sendMessage(uint64_t chat_id,
     }
 }
 
+void TelegramClient::editMessage(uint64_t chat_id,
+                                const std::string& text,
+                                uint64_t  update_msg_id,
+                                const std::vector<inline_button>& inline_buttons={},
+                                ParseMode mode=ParseMode::MARKDOWN_V2,
+                                MessageWebPreview web_preview=MessageWebPreview::ENABLE_PREVIEW,
+                                const std::string& espace_symbols="_~>#+-=|{}.!"){
+
+    auto prepared_text = StringMisc::escapeString(text, espace_symbols);
+    json params = {
+        {"chat_id",     chat_id},
+        {"text",        prepared_text},
+        {"message_id",  update_msg_id},
+        {"parse_mode",  (mode == ParseMode::MARKDOWN_V2)? "MarkdownV2":"HTML"},
+    };
+    if(web_preview == MessageWebPreview::DISABLE_PREVIEW){
+        params["disable_web_page_preview"] = true;
+    }
+    if(!inline_buttons.empty())
+        params["reply_markup"] = inline_menu::BotInlineMenus::createInlineKeyboard(inline_buttons);
+    try{
+        LOG_DEBUG(params.dump());
+
+        callRequest(TgAPIRequest::EDIT_MESSAGE, params);
+    }
+    catch(const std::exception& e){
+        LOG_ERROR(e.what());
+
+    }
+}
 void TelegramClient::sendMainMenu(uint64_t chat_id){
     return sendMessage(chat_id, "Главное Меню", inline_menu::BotInlineMenus::getMainMenuButtons());
 }
@@ -187,7 +217,7 @@ void TelegramClient::sendSteamPurchasedMenu(uint64_t chat_id){
     return sendMessage(chat_id, "Список покупок", inline_menu::BotInlineMenus::getSteamPurchasedMenuButtons());
 }
 void TelegramClient::sendSteamWatchMenu(uint64_t chat_id){
-    return sendMessage(chat_id, "Список отслуживания", inline_menu::BotInlineMenus::getSteamWatchMenuButtons());
+    return sendMessage(chat_id, "Список отслеживания", inline_menu::BotInlineMenus::getSteamWatchMenuButtons());
     
 }
 void TelegramClient::sendSteamSurveyMenu(uint64_t chat_id){
@@ -197,5 +227,29 @@ void TelegramClient::sendSteamSurveyMenu(uint64_t chat_id){
 void TelegramClient::sendSteamNotificationMenu(uint64_t chat_id){
     return sendMessage(chat_id, "Список уведомлений", inline_menu::BotInlineMenus::getSteamNotificationMenuButtons());
     
+}
+
+void TelegramClient::editMainMenu(uint64_t chat_id, uint64_t message_id){
+    return editMessage(chat_id, "Главное Меню", message_id, inline_menu::BotInlineMenus::getMainMenuButtons());
+}
+
+void TelegramClient::editSteamMainMenu(uint64_t chat_id, uint64_t message_id){
+    return editMessage(chat_id, "Steam Меню", message_id, inline_menu::BotInlineMenus::getSteamMainMenuButtons());
+}
+
+void TelegramClient::editSteamPurchasedMenu(uint64_t chat_id, uint64_t message_id){
+    return editMessage(chat_id, "Список покупок", message_id, inline_menu::BotInlineMenus::getSteamPurchasedMenuButtons());
+}
+
+void TelegramClient::editSteamWatchMenu(uint64_t chat_id, uint64_t message_id){
+    return editMessage(chat_id, "Список отслеживания", message_id, inline_menu::BotInlineMenus::getSteamWatchMenuButtons());
+}
+
+void TelegramClient::editSteamSurveyMenu(uint64_t chat_id, uint64_t message_id){
+    return editMessage(chat_id, "Список опросов", message_id, inline_menu::BotInlineMenus::getSteamSurveyMenuButtons());
+}
+
+void TelegramClient::editSteamNotificationMenu(uint64_t chat_id, uint64_t message_id){
+    return editMessage(chat_id, "Список уведомлений", message_id, inline_menu::BotInlineMenus::getSteamNotificationMenuButtons());
 }
 
