@@ -122,7 +122,7 @@ json TelegramClient::callMethod(const std::string& method, RequestType type, con
         std::ostringstream response;
         request.setOpt(curlpp::options::WriteStream(&response));
         {
-            std::unique_lock lock(m_mutex);
+            // std::unique_lock lock(m_mutex);
             request.perform();
         }
         

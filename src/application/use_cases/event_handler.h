@@ -7,6 +7,8 @@
 #include "log_macros.h"
 #include "string_misc.h"
 
+#include "price_overview_parser.h"
+
 #include <functional>
 #include <memory>
 #include <sstream>
@@ -119,7 +121,7 @@ private:
                 set_user_state(user, "normal_work");
             }
         }
-
+        //WatchList handling
         else if(callback_data == inline_menu::c_steam_watch_list_list_cb_data){
             auto links = m_watch_rep->getLinks(user);
             auto links_qty = links.size();
@@ -188,6 +190,27 @@ private:
                                         inline_menu::BotInlineMenus::getSteamWatchMenuButtons());
             }
         }
+        else if(callback_data == inline_menu::c_steam_watch_list_info_cb_data){
+            try{
+                
+                auto links = m_watch_rep->getLinks(user);
+
+                for(auto& link: links){
+                    auto msg = StringMisc::createMarkdownLink(link.url, link.title);
+                    msg += "\n";
+                    msg += getWatchLinkPriceOverview(link);
+                    m_tg_client->sendMessage(event.chat_id,
+                                            msg);
+                }
+                m_tg_client->sendSteamWatchMenu(event.chat_id);
+            }
+            catch(std::exception& e){
+                LOG_ERROR(e.what());
+                m_tg_client->sendMessage(event.chat_id,
+                                        "Ошибка построения списка удаления",
+                                        inline_menu::BotInlineMenus::getSteamWatchMenuButtons());
+            }
+        }
     }
 
     void sendUserWatchListItems(const User& user, const CallbackEvent& event){
@@ -246,5 +269,25 @@ private:
     void set_user_state(User& user, const std::string& state){
         user.set_state(state);
         m_user_rep->save(user);
+    }
+
+    std::string getWatchLinkPriceOverview(const WatchLink& link){
+        std::stringstream out_msg;
+        auto index = link.url.rfind("/");
+        const std::string item_hash_name = link.url.substr(index + 1);
+        auto res = PriceOverview::Parser::getSteamItemPrice("730", item_hash_name);
+        LOG_DEBUG(res);
+        auto res_json = json::parse(res);
+
+        if(res_json["success"].get<bool>()){
+            out_msg <<  "Начальная цена на продажу: *" << res_json["lowest_price"] << "*\n" <<
+                        "Медианная цена: *" << res_json["median_price"] << "*\n" <<
+                        "Объем лотов: *" << res_json["volume"] << "*" << std::endl; 
+        }
+        else{
+            LOG_ERROR(res_json["error"].get<std::string>());
+            out_msg << "*" << link.title << "*. Ошибка выполнения запроса";
+        }
+        return out_msg.str();
     }
 };
