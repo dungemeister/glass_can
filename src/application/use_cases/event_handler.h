@@ -194,9 +194,9 @@ private:
             try{
                 
                 auto links = m_watch_rep->getLinks(user);
-
+                std::string msg;
                 for(auto& link: links){
-                    auto msg = StringMisc::createMarkdownLink(link.url, link.title);
+                    msg = StringMisc::createMarkdownLink(link.url, link.title);
                     msg += "\n";
                     msg += getWatchLinkPriceOverview(link);
                     m_tg_client->sendMessage(event.chat_id,

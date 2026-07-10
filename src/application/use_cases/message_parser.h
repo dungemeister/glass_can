@@ -15,6 +15,9 @@ public:
         auto it = msg.find("callback_query");
         if(it == msg.end()){
             json_msg = msg["message"];
+
+            if(json_msg["text"].is_null()) throw std::runtime_error("Unknown message type");
+            
             auto text = json_msg["text"].get<std::string>();
             if (text[0] == '/'){
                 event = CommandEvent();

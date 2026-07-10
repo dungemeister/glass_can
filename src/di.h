@@ -33,17 +33,17 @@ struct CompositionContainer{
 
         m_db_connection = std::make_shared<Sqlite3Connection>(db_config);
 
-        // m_user_rep = std::make_shared<UserSqliteRepository>(m_db_connection);
-        // m_watch_rep = std::make_shared<WatchLinkSqliteRepository>(m_db_connection);
-        // m_user_service = std::make_shared<UserService>(*m_user_rep);
+        m_user_rep = std::make_shared<UserSqliteRepository>(m_db_connection);
+        m_watch_rep = std::make_shared<WatchLinkSqliteRepository>(m_db_connection);
+        m_user_service = std::make_shared<UserService>(*m_user_rep);
 
         BotConfig bot_config(config_file);
         m_telegram_client = std::make_shared<TelegramClient>(bot_config.getBotToken());
-        // m_workers_pool = std::make_shared<WorkerPool>(bot_config.getBotWorkers());
+        m_workers_pool = std::make_shared<WorkerPool>(bot_config.getBotWorkers());
 
-        // m_event_handler = std::make_shared<EventHandler>(m_telegram_client,
-        //                                                 m_user_rep,
-        //                                                 m_watch_rep);
+        m_event_handler = std::make_shared<EventHandler>(m_telegram_client,
+                                                        m_user_rep,
+                                                        m_watch_rep);
 
     }
 
@@ -53,18 +53,18 @@ struct CompositionContainer{
             auto events = m_telegram_client->getUpdates(offset);
             LOG_DEBUG("GOT UPDATES");
             
-            // for(const auto& event: events){
-            //     // offset = update["update_id"].get<uint64_t>() + 1;
-            //     m_workers_pool->enqueue([this, event]{
-            //         EventHandler::ResponseCallback cb = [](const std::string& msg){
-            //             LOG_INFO(msg);
-            //         };
-            //         m_event_handler->execute(event, cb);
-            //         // handleUpdate(update);
-            //         // std::cout << msg.get_chat().get_username().value() << ": " << msg.get_text().value() << std::endl;
-            //     });
+            for(const auto& event: events){
+                // offset = update["update_id"].get<uint64_t>() + 1;
+                m_workers_pool->enqueue([this, event]{
+                    EventHandler::ResponseCallback cb = [](const std::string& msg){
+                        LOG_INFO(msg);
+                    };
+                    m_event_handler->execute(event, cb);
+                    // handleUpdate(update);
+                    // std::cout << msg.get_chat().get_username().value() << ": " << msg.get_text().value() << std::endl;
+                });
 
-            // }
+            }
             // std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }

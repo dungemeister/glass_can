@@ -35,20 +35,24 @@ std::vector<BotEvent> TelegramClient::getUpdates(int64_t& offset){
         json params = {
             {"offset", offset}
         };
+        static MessageParser parser;
         auto msgs = callRequest(TgAPIRequest::GET_UPDATES, params);
         for(auto msg: msgs){
             LOG_DEBUG(msg.dump(2));
             auto update_id = msg["update_id"].get<int64_t>();
-            
-            MessageParser parser;
-            auto event = parser(msg);
-            if(std::holds_alternative<CallbackEvent>(event)){
-                auto& event_ = std::get<CallbackEvent>(event);
-                answerCallbackQuery(event_.callback_query_id);
-            }
+            try{
+                auto event = parser(msg);
+                if(std::holds_alternative<CallbackEvent>(event)){
+                    auto& event_ = std::get<CallbackEvent>(event);
+                    answerCallbackQuery(event_.callback_query_id);
+                }
 
-            res.push_back(std::move(event));
-            offset = update_id + 1;
+                res.push_back(std::move(event));
+                offset = update_id + 1;
+            }
+            catch(std::exception& e){
+                LOG_ERROR(e.what());
+            }            
         }
         return res;
     }
