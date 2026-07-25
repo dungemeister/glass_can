@@ -3,6 +3,7 @@
 #include <sqlite3.h>
 #include <stdexcept>
 #include <mutex>
+#include "misc.h"
 
 class Sqlite3Connection{
 public:

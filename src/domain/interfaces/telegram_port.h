@@ -48,4 +48,12 @@ public:
     virtual void editSteamWatchMenu(uint64_t chat_id, uint64_t message_id) = 0;
     virtual void editSteamSurveyMenu(uint64_t chat_id, uint64_t message_id) = 0;
     virtual void editSteamNotificationMenu(uint64_t chat_id, uint64_t message_id) = 0;
+
+    //New BOT API 10.1 
+    virtual void sendRichMessage(uint64_t chat_id,
+                            const std::string& text,
+                            const std::vector<inline_button>& inline_keyboard={},
+                            ParseMode mode=ParseMode::MARKDOWN_V2,
+                            MessageWebPreview web_preview=MessageWebPreview::ENABLE_PREVIEW,
+                            const std::string& espace_symbols="_~>#+-=|{}.!") = 0;
 };

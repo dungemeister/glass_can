@@ -24,6 +24,7 @@ void TelegramClient::init_request_table(){
         {TgAPIRequest::SET_CHAT_MENU_BUTTON,  {"setChatMenuButton",     RequestType::POST}},
         {TgAPIRequest::GET_AVAILABLE_GIFTS,   {"getAvailableGifts",     RequestType::GET}},
         {TgAPIRequest::SET_MY_COMMANDS,       {"setMyCommands",         RequestType::POST}},
+        {TgAPIRequest::SEND_RICH_MESSAGE,     {"sendRichMessage",       RequestType::POST}},
 
     };
 }
@@ -158,7 +159,8 @@ void TelegramClient::sendMessage(uint64_t chat_id,
                                 ParseMode mode=ParseMode::MARKDOWN_V2,
                                 MessageWebPreview web_preview=MessageWebPreview::ENABLE_PREVIEW,
                                 const std::string& espace_symbols="_~>#+-=|{}.!"){
-    auto prepared_text = StringMisc::escapeString(text, espace_symbols);
+    // auto prepared_text = StringMisc::escapeString(text, espace_symbols);
+    auto& prepared_text = text;
     json params = {
         {"chat_id", chat_id},
         {"text", prepared_text},
@@ -257,3 +259,31 @@ void TelegramClient::editSteamNotificationMenu(uint64_t chat_id, uint64_t messag
     return editMessage(chat_id, "Список уведомлений", message_id, inline_menu::BotInlineMenus::getSteamNotificationMenuButtons());
 }
 
+void TelegramClient::sendRichMessage(uint64_t chat_id,
+                        const std::string& text,
+                        const std::vector<inline_button>& inline_buttons={},
+                        ParseMode mode=ParseMode::MARKDOWN_V2,
+                        MessageWebPreview web_preview=MessageWebPreview::ENABLE_PREVIEW,
+                        const std::string& espace_symbols="_~>#+-=|{}.!"){
+
+    auto& prepared_text = text;
+    json params = {
+        {"chat_id", chat_id},
+        {"rich_message", {{"markdown", prepared_text}}},
+        {"parse_mode", (mode == ParseMode::MARKDOWN_V2)? "MarkdownV2":"HTML"},
+    };
+    if(web_preview == MessageWebPreview::DISABLE_PREVIEW){
+        params["disable_web_page_preview"] = true;
+    }
+    if(!inline_buttons.empty())
+        params["reply_markup"] = inline_menu::BotInlineMenus::createInlineKeyboard(inline_buttons);
+    try{
+        LOG_DEBUG(params.dump());
+
+        callRequest(TgAPIRequest::SEND_RICH_MESSAGE, params);
+    }
+    catch(const std::exception& e){
+        LOG_ERROR(e.what());
+
+    }
+}

@@ -8,6 +8,7 @@ set(SOURCES main.cpp
             core/worker_pool.cpp
             infrastructure/sqlite3/user_repository_sqlite.cpp
             infrastructure/sqlite3/watch_link_repository_sqlite.cpp
+            infrastructure/sqlite3/purchase_repository_sqlite.cpp
             infrastructure/telegram/telegram_client.cpp
             )
 

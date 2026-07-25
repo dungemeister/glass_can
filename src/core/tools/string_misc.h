@@ -5,6 +5,7 @@
 #include <regex>
 
 namespace StringMisc{
+    const std::string c_full_escaping_sequence = "_~><#+-_=().!|";
 
     enum SplitOnce{
         FROM_START,
@@ -78,7 +79,7 @@ namespace StringMisc{
     static std::string createMarkdownLink(const std::string& url, const std::string& text){
         std::stringstream out;
         auto text_copy = removeQuotes(text);
-        text_copy = escapeString(text_copy, "_~>#+-=|{}.!()");
+        // text_copy = escapeString(text_copy, "_~>#+-=|{}.!()");
         
         auto url_copy  = removeQuotes(url);
         url_copy = escapeString(url_copy, "()");
@@ -168,6 +169,20 @@ namespace StringMisc{
         return res;
     }
 
+    static std::vector<std::string> splitToGroupsByRegex(const std::string& input, const std::regex& delim_pattern){
+
+        std::vector<std::string> res;
+        std::smatch matches;
+
+        if (std::regex_search(input, matches, delim_pattern)) {
+        for (size_t i = 1; i < matches.size(); ++i) {
+            res.emplace_back(matches[i]);
+        }
+        } else {
+            return {};
+        }
+        return res;
+    }
     static std::vector<std::string> splitOnceByDelim(const std::string& input, char delim, SplitOnce start=SplitOnce::FROM_START){
         std::vector<std::string> tokens;
         size_t pos;

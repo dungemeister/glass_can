@@ -10,25 +10,38 @@ namespace inline_menu{
     const std::string c_steam_watch_list_menu_cb_data                = "steam_watch_list_menu";
     const std::string c_steam_survey_list_menu_cb_data               = "steam_survey_list_menu";
     const std::string c_steam_notification_list_menu_cb_data         = "steam_notification_list_menu";
+    
     //Watch list callback_data
+    const std::string c_steam_watch_list_prefix                 = "steam_watch_list";
     const std::string c_steam_watch_list_list_cb_data           = "steam_watch_list_list_btn";
     const std::string c_steam_watch_list_add_cb_data            = "steam_watch_list_add_btn";
     const std::string c_steam_watch_list_delete_list_cb_data    = "steam_watch_list_delete_list_btn";
     const std::string c_steam_watch_list_delete_cb_data         = "steam_watch_list_delete_btn";
     const std::string c_steam_watch_list_info_cb_data           = "steam_watch_list_info_btn";
 
-    const std::string c_watch_list_delete_prefix = "wdelete";
+    const std::string c_watch_list_delete_prefix = "wl_delete";
+
     //Survey list callback_data
     const std::string c_steam_survey_list_list_cb_data    = "steam_survey_list_list_btn";
     const std::string c_steam_survey_list_add_cb_data     = "steam_survey_list_add_btn";
     const std::string c_steam_survey_list_delete_cb_data  = "steam_survey_list_delete_btn";
     const std::string c_steam_survey_list_info_cb_data    = "steam_survey_list_info_btn";
+    
     //Notification list callback_data
     const std::string c_steam_notification_list_list_cb_data    = "steam_notific_list_list_btn";
     const std::string c_steam_notification_list_add_cb_data     = "steam_notific_list_add_btn";
     const std::string c_steam_notification_list_delete_cb_data  = "steam_notific_list_delete_btn";
     const std::string c_steam_notification_list_info_cb_data    = "steam_notific_list_info_btn";
     
+    //Purchased list callback_data
+    const std::string c_steam_purchase_list_prefix          = "steam_purchase_list";
+    const std::string c_steam_purchase_list_list_cb_data    = "steam_purchase_list_list_btn";
+    const std::string c_steam_purchase_list_add_cb_data     = "steam_purchase_list_add_btn";
+    const std::string c_steam_purchase_list_delete_cb_data  = "steam_purchase_list_delete_btn";
+    const std::string c_steam_purchase_list_info_cb_data    = "steam_purchase_list_info_btn";
+
+    const std::string c_purchase_list_delete_prefix = "pl_delete";
+
     class BotInlineMenus{
         using json = nlohmann::json;
     public:
@@ -50,10 +63,10 @@ namespace inline_menu{
 
         static std::vector<std::pair<std::string, std::string>> getSteamPurchasedMenuButtons(){
             std::vector<std::pair<std::string, std::string>> buttons;
-            buttons.emplace_back("📋Отобразить список",  c_steam_purchase_list_menu_cb_data);
-            buttons.emplace_back("➕Добавить предмет",   c_steam_watch_list_menu_cb_data);
-            buttons.emplace_back("➖Удалить предмет",    c_steam_survey_list_menu_cb_data);
-            buttons.emplace_back("📈Графики предметов",  c_steam_notification_list_menu_cb_data);
+            buttons.emplace_back("📋Отобразить список",  c_steam_purchase_list_list_cb_data);
+            buttons.emplace_back("➕Добавить предмет",   c_steam_purchase_list_add_cb_data);
+            buttons.emplace_back("➖Удалить предмет",    c_steam_purchase_list_delete_cb_data);
+            buttons.emplace_back("📈Графики предметов",  c_steam_purchase_list_info_cb_data);
             buttons.emplace_back("🔄В главное меню",     c_steam_menu_cb_data);
             return buttons;
         }

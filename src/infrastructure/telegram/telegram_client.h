@@ -31,6 +31,7 @@ public:
         SET_CHAT_MENU_BUTTON,
         GET_AVAILABLE_GIFTS,
         SET_MY_COMMANDS,
+        SEND_RICH_MESSAGE,
     };
     
 
@@ -77,4 +78,10 @@ private:
     void answerCallbackQuery(const std::string& callback_id);
 
 
+    void sendRichMessage(uint64_t chat_id,
+                        const std::string& text,
+                        const std::vector<inline_button>& inline_keyboard,
+                        ParseMode mode,
+                        MessageWebPreview web_preview,
+                        const std::string& espace_symbols) override;
 };

@@ -2,8 +2,11 @@
 #include "user_service.h"
 #include "telegram_client.h"
 #include "bot_config.h"
+
 #include "user_repository_sqlite.h"
 #include "watch_link_repository_sqlite.h"
+#include "purchase_repository_sqlite.h"
+
 #include "worker_pool.h"
 #include "event_handler.h"
 #include "log_macros.h"
@@ -12,6 +15,8 @@
 struct CompositionContainer{
     std::shared_ptr<UserSqliteRepository> m_user_rep;
     std::shared_ptr<WatchLinkSqliteRepository> m_watch_rep;
+    std::shared_ptr<PurchaseRepositorySqlite> m_purchase_rep;
+
     std::shared_ptr<UserService> m_user_service;
     std::shared_ptr<TelegramClient> m_telegram_client;
     std::shared_ptr<Sqlite3Connection> m_db_connection;
@@ -35,6 +40,7 @@ struct CompositionContainer{
 
         m_user_rep = std::make_shared<UserSqliteRepository>(m_db_connection);
         m_watch_rep = std::make_shared<WatchLinkSqliteRepository>(m_db_connection);
+        m_purchase_rep = std::make_shared<PurchaseRepositorySqlite>(m_db_connection);
         m_user_service = std::make_shared<UserService>(*m_user_rep);
 
         BotConfig bot_config(config_file);
@@ -43,7 +49,8 @@ struct CompositionContainer{
 
         m_event_handler = std::make_shared<EventHandler>(m_telegram_client,
                                                         m_user_rep,
-                                                        m_watch_rep);
+                                                        m_watch_rep,
+                                                        m_purchase_rep);
 
     }
 
